@@ -5,10 +5,10 @@ echo "Starting Noticeboard Installation..."
 
 # Update and install dependencies
 sudo apt-get update
-sudo apt-get install -y python3-pip python3-pyqt6
+sudo apt-get install -y python3-pip
 
 # Install python packages
-pip3 install flask flask-sqlalchemy flask-cors requests qtawesome
+python3 -m pip install flask flask-sqlalchemy flask-cors requests qtawesome
 
 # Create directory structure if not exists
 mkdir -p ~/noticeboard_app

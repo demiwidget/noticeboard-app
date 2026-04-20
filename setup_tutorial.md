@@ -50,7 +50,7 @@ This section guides you through setting up the display client and backend server
     ```
 3.  **Install Python PyQt6**: The display application uses PyQt6 for its GUI.
     ```bash
-    sudo apt install python3-pyqt6 -y
+    # The display application uses PyQt6 for its GUI, which will be installed via pip later.
     ```
 
 ### Transferring Files
@@ -59,9 +59,9 @@ There are a few ways to get the project files onto your Raspberry Pi. The easies
 
 1.  **Clone the Repository**: Open a terminal on your Raspberry Pi and run:
     ```bash
-    git clone https://github.com/demiwidget/noticeboard-app.git /home/pi/noticeboard_app
+    git clone https://github.com/demiwidget/noticeboard-app.git /home/jamie/noticeboard_app
     ```
-    *Note: Replace `/home/pi/noticeboard_app` with your desired installation path if different. Ensure the `pi` user has write permissions to this directory.*
+    *Note: Replace `/home/jamie/noticeboard_app` with your desired installation path if different. Ensure the `jamie` user has write permissions to this directory.*
 
 ### Running the Installation Script
 
@@ -69,7 +69,7 @@ Navigate to the `scripts` directory within the cloned repository and run the ins
 
 1.  **Navigate to scripts directory**:
     ```bash
-    cd /home/pi/noticeboard_app/scripts
+    cd /home/jamie/noticeboard_app/scripts
     ```
 2.  **Make the script executable**:
     ```bash
@@ -80,7 +80,7 @@ Navigate to the `scripts` directory within the cloned repository and run the ins
     ./install_pi.sh
     ```
     This script will:
-    *   Install necessary Python packages (`flask`, `flask-sqlalchemy`, `flask-cors`, `requests`, `qtawesome`).
+    *   Install necessary Python packages (`flask`, `flask-sqlalchemy`, `flask-cors`, `requests`, `qtawesome`, `PyQt6`).
     *   Copy the `noticeboard-backend.service` and `noticeboard-display.service` files to `/etc/systemd/system/`.
     *   Reload systemd, enable, and start both services.
 
@@ -122,7 +122,7 @@ This section details how to set up and run the PC application to manage your not
     ```
 3.  **Install Python Dependencies**:
     ```bash
-    pip install PyQt6 requests qtawesome
+    python3 -m pip install PyQt6 requests qtawesome
     ```
 
 ### Running the Application
@@ -156,7 +156,7 @@ Once connected, you can start managing your noticeboard:
 *   **Pi Display Not Showing**: 
     *   Ensure the Raspberry Pi is connected to a display and is powered on.
     *   Check service status (`sudo systemctl status noticeboard-display.service`).
-    *   Verify `DISPLAY=:0` and `XAUTHORITY=/home/pi/.Xauthority` are correctly set in the service file.
+    *   Verify `DISPLAY=:0` and `XAUTHORITY=/home/jamie/.Xauthority` are correctly set in the service file.
     *   Ensure `python3-pyqt6` is installed.
 *   **PC App Cannot Connect to Pi**: 
     *   Verify the Raspberry Pi's IP address is correct and that both devices are on the same network.

@@ -26,7 +26,7 @@ A modern, dual-application noticeboard system designed for a Raspberry Pi displa
 
 ### 2. PC Management Setup
 1. Ensure you have Python installed.
-2. Install dependencies: `pip install PyQt6 requests qtawesome`.
+2. Install dependencies: `python3 -m pip install PyQt6 requests qtawesome`.
 3. Run the app: `python pc_app/main.py`.
 4. Enter the IP address of your Raspberry Pi in the top bar and click "Connect".
 
