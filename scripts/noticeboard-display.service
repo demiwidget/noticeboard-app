@@ -1,0 +1,16 @@
+[Unit]
+Description=Noticeboard Display Client
+After=network.target noticeboard-backend.service
+Wants=noticeboard-backend.service
+
+[Service]
+User=pi
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/pi/.Xauthority
+WorkingDirectory=/home/pi/noticeboard_app/pi_display
+ExecStart=/usr/bin/python3 /home/pi/noticeboard_app/pi_display/main.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=graphical.target

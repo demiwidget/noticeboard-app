@@ -1,0 +1,13 @@
+[Unit]
+Description=Noticeboard Backend API
+After=network.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/noticeboard_app/backend
+ExecStart=/usr/bin/python3 /home/pi/noticeboard_app/backend/app.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
