@@ -48,9 +48,9 @@ This section guides you through setting up the display client and backend server
     ```bash
     sudo apt install git -y
     ```
-3.  **Install Python PyQt6**: The display application uses PyQt6 for its GUI.
+3.  **Leave Python packages to the installer**: The installer uses Raspberry Pi OS/Debian `apt` packages for the backend and Qt display dependencies.
     ```bash
-    # The display application uses PyQt6 for its GUI, which will be installed via pip later.
+    # No manual pip install is needed on the Raspberry Pi.
     ```
 
 ### Transferring Files
@@ -59,9 +59,9 @@ There are a few ways to get the project files onto your Raspberry Pi. The easies
 
 1.  **Clone the Repository**: Open a terminal on your Raspberry Pi and run:
     ```bash
-    git clone https://github.com/demiwidget/noticeboard-app.git /home/jamie/noticeboard_app
+    git clone https://github.com/demiwidget/noticeboard-app.git ~/noticeboard-app
     ```
-    *Note: Replace `/home/jamie/noticeboard_app` with your desired installation path if different. Ensure the `jamie` user has write permissions to this directory.*
+    *Note: You can choose a different install path. The installer detects the actual path and current user when it generates the systemd services.*
 
 ### Running the Installation Script
 
@@ -69,7 +69,7 @@ Navigate to the `scripts` directory within the cloned repository and run the ins
 
 1.  **Navigate to scripts directory**:
     ```bash
-    cd /home/jamie/noticeboard_app/scripts
+    cd ~/noticeboard-app/scripts
     ```
 2.  **Make the script executable**:
     ```bash
@@ -80,8 +80,8 @@ Navigate to the `scripts` directory within the cloned repository and run the ins
     ./install_pi.sh
     ```
     This script will:
-    *   Install necessary Python packages (`flask`, `flask-sqlalchemy`, `flask-cors`, `requests`, `qtawesome`, `PyQt6`).
-    *   Copy the `noticeboard-backend.service` and `noticeboard-display.service` files to `/etc/systemd/system/`.
+    *   Install necessary Raspberry Pi OS/Debian packages (`python3-flask`, `python3-flask-sqlalchemy`, `python3-flask-cors`, `python3-requests`, and either `python3-pyqt6` or `python3-pyqt5`).
+    *   Generate `noticeboard-backend.service` and `noticeboard-display.service` in `/etc/systemd/system/` with the correct username and project path.
     *   Reload systemd, enable, and start both services.
 
 ### Verifying Services
@@ -156,8 +156,9 @@ Once connected, you can start managing your noticeboard:
 *   **Pi Display Not Showing**: 
     *   Ensure the Raspberry Pi is connected to a display and is powered on.
     *   Check service status (`sudo systemctl status noticeboard-display.service`).
-    *   Verify `DISPLAY=:0` and `XAUTHORITY=/home/jamie/.Xauthority` are correctly set in the service file.
-    *   Ensure `python3-pyqt6` is installed.
+    *   View display logs with `sudo journalctl -u noticeboard-display -n 100 --no-pager`.
+    *   Ensure the Pi boots into the graphical desktop, preferably with auto-login enabled for the same user that ran the installer.
+    *   If your Pi uses an older Raspberry Pi OS release, the display can fall back to `python3-pyqt5`; Bookworm systems should use `python3-pyqt6`.
 *   **PC App Cannot Connect to Pi**: 
     *   Verify the Raspberry Pi's IP address is correct and that both devices are on the same network.
     *   Check if the backend service is running on the Pi (`sudo systemctl status noticeboard-backend.service`).

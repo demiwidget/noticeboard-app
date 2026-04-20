@@ -1,14 +1,21 @@
 [Unit]
 Description=Noticeboard Display Client
-After=network.target noticeboard-backend.service
+After=graphical.target noticeboard-backend.service
 Wants=noticeboard-backend.service
 
 [Service]
-User=jamie
+Type=simple
+# This is a template example. Run scripts/install_pi.sh to generate a service
+# with the correct user, absolute project path, and display environment.
+User=__NOTICEBOARD_USER__
 Environment=DISPLAY=:0
-Environment=XAUTHORITY=/home/jamie/.Xauthority
-WorkingDirectory=/home/jamie/noticeboard_app/pi_display
-ExecStart=/usr/bin/python3 /home/jamie/noticeboard_app/pi_display/main.py
+Environment=XAUTHORITY=__NOTICEBOARD_HOME__/.Xauthority
+Environment=XDG_RUNTIME_DIR=/run/user/__NOTICEBOARD_UID__
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment="QT_QPA_PLATFORM=wayland;xcb"
+Environment=NOTICEBOARD_API_URL=http://127.0.0.1:5000/api
+WorkingDirectory=__NOTICEBOARD_APP_DIR__/pi_display
+ExecStart=/usr/bin/python3 __NOTICEBOARD_APP_DIR__/pi_display/main.py
 Restart=always
 RestartSec=10
 

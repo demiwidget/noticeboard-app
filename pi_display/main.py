@@ -1,14 +1,37 @@
 import sys
+import os
 import requests
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QLabel, QFrame, QScrollArea, QGridLayout)
-from PyQt6.QtCore import Qt, QTimer, QDateTime
-from PyQt6.QtGui import QFont, QColor, QLinearGradient, QPalette, QBrush
+
+try:
+    from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
+                                 QHBoxLayout, QLabel, QFrame, QScrollArea, QGridLayout)
+    from PyQt6.QtCore import Qt, QTimer, QDateTime
+    from PyQt6.QtGui import QFont, QColor, QLinearGradient, QPalette, QBrush
+    QT6 = True
+except ImportError:
+    from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
+                                 QHBoxLayout, QLabel, QFrame, QScrollArea, QGridLayout)
+    from PyQt5.QtCore import Qt, QTimer, QDateTime
+    from PyQt5.QtGui import QFont, QColor, QLinearGradient, QPalette, QBrush
+    QT6 = False
+
+if QT6:
+    ALIGN_TOP = Qt.AlignmentFlag.AlignTop
+    FONT_BOLD = QFont.Weight.Bold
+    FONT_DEMIBOLD = QFont.Weight.DemiBold
+    PALETTE_WINDOW = QPalette.ColorRole.Window
+    STYLED_PANEL = QFrame.Shape.StyledPanel
+else:
+    ALIGN_TOP = Qt.AlignTop
+    FONT_BOLD = QFont.Bold
+    FONT_DEMIBOLD = QFont.DemiBold
+    PALETTE_WINDOW = QPalette.Window
+    STYLED_PANEL = QFrame.StyledPanel
 
 class Card(QFrame):
     def __init__(self, title, content, priority, type="notice", assignee=None, time=None):
         super().__init__()
-        self.setFrameShape(QFrame.Shape.StyledPanel)
+        self.setFrameShape(STYLED_PANEL)
         
         # Color mapping
         colors = {
@@ -33,7 +56,7 @@ class Card(QFrame):
         layout = QVBoxLayout(self)
         
         title_lbl = QLabel(title)
-        title_lbl.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
+        title_lbl.setFont(QFont("Segoe UI", 18, FONT_BOLD))
         title_lbl.setStyleSheet(f"color: {accent};")
         title_lbl.setWordWrap(True)
         layout.addWidget(title_lbl)
@@ -47,7 +70,7 @@ class Card(QFrame):
         else:
             info_layout = QHBoxLayout()
             person_lbl = QLabel(f"👤 {assignee}")
-            person_lbl.setFont(QFont("Segoe UI", 14, QFont.Weight.DemiBold))
+            person_lbl.setFont(QFont("Segoe UI", 14, FONT_DEMIBOLD))
             person_lbl.setStyleSheet("color: #34495e;")
             
             time_lbl = QLabel(f"⏰ {time}")
@@ -64,7 +87,7 @@ class PiDisplay(QMainWindow):
         super().__init__()
         self.setWindowTitle("Department Noticeboard")
         self.showFullScreen()
-        self.server_url = "http://localhost:5000/api"
+        self.server_url = os.environ.get("NOTICEBOARD_API_URL", "http://127.0.0.1:5000/api")
         
         self.init_ui()
         
@@ -88,7 +111,7 @@ class PiDisplay(QMainWindow):
         gradient = QLinearGradient(0, 0, 0, 400)
         gradient.setColorAt(0.0, QColor("#2c3e50"))
         gradient.setColorAt(1.0, QColor("#000000"))
-        palette.setBrush(QPalette.ColorRole.Window, QBrush(gradient))
+        palette.setBrush(PALETTE_WINDOW, QBrush(gradient))
         self.setPalette(palette)
         
         self.main_layout = QVBoxLayout(central)
@@ -98,7 +121,7 @@ class PiDisplay(QMainWindow):
         # Header
         header = QHBoxLayout()
         self.title_label = QLabel("DEPARTMENT NOTICEBOARD")
-        self.title_label.setFont(QFont("Segoe UI", 36, QFont.Weight.Bold))
+        self.title_label.setFont(QFont("Segoe UI", 36, FONT_BOLD))
         self.title_label.setStyleSheet("color: white; letter-spacing: 2px;")
         header.addWidget(self.title_label)
         
@@ -118,7 +141,7 @@ class PiDisplay(QMainWindow):
         # Notices Column
         notices_col = QVBoxLayout()
         notices_title = QLabel("📢 NOTICES")
-        notices_title.setFont(QFont("Segoe UI", 22, QFont.Weight.Bold))
+        notices_title.setFont(QFont("Segoe UI", 22, FONT_BOLD))
         notices_title.setStyleSheet("color: #3498db;")
         notices_col.addWidget(notices_title)
         
@@ -128,14 +151,14 @@ class PiDisplay(QMainWindow):
         self.notices_widget = QWidget()
         self.notices_widget.setStyleSheet("background: transparent;")
         self.notices_layout = QVBoxLayout(self.notices_widget)
-        self.notices_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.notices_layout.setAlignment(ALIGN_TOP)
         self.notices_area.setWidget(self.notices_widget)
         notices_col.addWidget(self.notices_area)
         
         # Tasks Column
         tasks_col = QVBoxLayout()
         tasks_title = QLabel("✅ TASKS")
-        tasks_title.setFont(QFont("Segoe UI", 22, QFont.Weight.Bold))
+        tasks_title.setFont(QFont("Segoe UI", 22, FONT_BOLD))
         tasks_title.setStyleSheet("color: #2ecc71;")
         tasks_col.addWidget(tasks_title)
         
@@ -145,7 +168,7 @@ class PiDisplay(QMainWindow):
         self.tasks_widget = QWidget()
         self.tasks_widget.setStyleSheet("background: transparent;")
         self.tasks_layout = QVBoxLayout(self.tasks_widget)
-        self.tasks_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.tasks_layout.setAlignment(ALIGN_TOP)
         self.tasks_area.setWidget(self.tasks_widget)
         tasks_col.addWidget(self.tasks_area)
         
@@ -188,4 +211,6 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = PiDisplay()
     window.show()
-    sys.exit(app.exec())
+    if hasattr(app, "exec"):
+        sys.exit(app.exec())
+    sys.exit(app.exec_())

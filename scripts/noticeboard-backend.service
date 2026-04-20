@@ -1,11 +1,17 @@
 [Unit]
 Description=Noticeboard Backend API
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
-User=jamie
-WorkingDirectory=/home/jamie/noticeboard_app/backend
-ExecStart=/usr/bin/python3 /home/jamie/noticeboard_app/backend/app.py
+Type=simple
+# This is a template example. Run scripts/install_pi.sh to generate a service
+# with the correct user and absolute project path for your Raspberry Pi.
+User=__NOTICEBOARD_USER__
+WorkingDirectory=__NOTICEBOARD_APP_DIR__/backend
+Environment=NOTICEBOARD_HOST=0.0.0.0
+Environment=NOTICEBOARD_PORT=5000
+ExecStart=/usr/bin/python3 __NOTICEBOARD_APP_DIR__/backend/app.py
 Restart=always
 RestartSec=5
 

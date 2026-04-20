@@ -18,11 +18,21 @@ A modern, dual-application noticeboard system designed for a Raspberry Pi displa
 ## Setup Instructions
 
 ### 1. Raspberry Pi Setup
-1. Copy the `backend/`, `pi_display/`, and `scripts/` folders to your Raspberry Pi (e.g., to `/home/pi/noticeboard_app`).
-2. Navigate to the `scripts/` folder.
-3. Make the install script executable: `chmod +x install_pi.sh`.
-4. Run the script: `./install_pi.sh`.
-5. The backend and display will now start automatically on every boot.
+1. Use Raspberry Pi OS with Desktop enabled and make sure the Pi boots into the desktop session.
+2. Copy or clone this repository to the Raspberry Pi. For example: `git clone https://github.com/demiwidget/noticeboard-app.git ~/noticeboard-app`.
+3. Navigate to the installer: `cd ~/noticeboard-app/scripts`.
+4. Make the install script executable: `chmod +x install_pi.sh`.
+5. Run the script: `./install_pi.sh`.
+6. The installer uses Raspberry Pi OS/Debian packages, writes systemd services with your actual username and clone path, then starts the backend and display.
+
+Useful Pi checks:
+
+```bash
+sudo systemctl status noticeboard-backend.service
+sudo systemctl status noticeboard-display.service
+curl http://localhost:5000/api/notices
+sudo journalctl -u noticeboard-backend -u noticeboard-display -f
+```
 
 ### 2. PC Management Setup
 1. Ensure you have Python installed.
