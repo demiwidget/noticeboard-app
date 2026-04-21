@@ -55,18 +55,18 @@ class Card(QFrame):
         self.setFrameShape(STYLED_PANEL)
 
         priority_styles = {
-            "High": {"accent": "#ff6154", "border": "#ffd7d3"},
-            "Medium": {"accent": "#ffb340", "border": "#ffe4b3"},
-            "Low": {"accent": "#45c2ff", "border": "#c7ebff"},
+            "High": {"accent": "#ef6b57", "border": "#f7c8be", "badge": "#b94f3e"},
+            "Medium": {"accent": "#d7ac45", "border": "#eddca8", "badge": "#8a6a18"},
+            "Low": {"accent": "#39a85d", "border": "#cce8d3", "badge": "#1f7d3f"},
         }
         style = priority_styles.get(priority, priority_styles["Low"])
 
         self.setStyleSheet(f"""
             QFrame#noticeCard {{
-                background-color: rgba(250, 252, 255, 248);
-                border: 3px solid {style["border"]};
-                border-left: 14px solid {style["accent"]};
-                border-radius: 24px;
+                background-color: rgba(249, 252, 249, 248);
+                border: 2px solid {style["border"]};
+                border-left: 10px solid {style["accent"]};
+                border-radius: 18px;
             }}
             QLabel {{
                 background: transparent;
@@ -75,28 +75,28 @@ class Card(QFrame):
         """)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 20, 24, 20)
-        layout.setSpacing(14)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(10)
 
         top_row = QHBoxLayout()
-        top_row.setSpacing(16)
+        top_row.setSpacing(12)
 
         title_lbl = QLabel(title)
-        title_lbl.setFont(QFont("DejaVu Sans", 24, FONT_BOLD))
-        title_lbl.setStyleSheet("color: #10213d;")
+        title_lbl.setFont(QFont("DejaVu Sans", 19, FONT_BOLD))
+        title_lbl.setStyleSheet("color: #10301f;")
         title_lbl.setWordWrap(True)
         top_row.addWidget(title_lbl, 1)
 
         priority_lbl = QLabel(priority.upper())
         priority_lbl.setAlignment(ALIGN_CENTER)
-        priority_lbl.setMinimumWidth(122)
-        priority_lbl.setFont(QFont("DejaVu Sans", 14, FONT_BOLD))
+        priority_lbl.setMinimumWidth(92)
+        priority_lbl.setFont(QFont("DejaVu Sans", 11, FONT_BOLD))
         priority_lbl.setStyleSheet(f"""
             QLabel {{
-                background-color: {style["accent"]};
+                background-color: {style["badge"]};
                 color: white;
-                border-radius: 16px;
-                padding: 8px 14px;
+                border-radius: 12px;
+                padding: 6px 10px;
             }}
         """)
         top_row.addWidget(priority_lbl)
@@ -104,38 +104,37 @@ class Card(QFrame):
 
         if type == "notice":
             content_lbl = QLabel(content)
-            content_lbl.setFont(QFont("DejaVu Sans", 20, FONT_DEMIBOLD))
-            content_lbl.setStyleSheet("color: #263b59; line-height: 1.35;")
+            content_lbl.setFont(QFont("DejaVu Sans", 15, FONT_DEMIBOLD))
+            content_lbl.setStyleSheet("color: #2c4a39;")
             content_lbl.setWordWrap(True)
             layout.addWidget(content_lbl)
         else:
             info_layout = QHBoxLayout()
-            info_layout.setSpacing(16)
+            info_layout.setSpacing(10)
 
             assignee_text = assignee or "Unassigned"
             due_text = time or "No due time"
 
             person_lbl = QLabel(f"ASSIGNEE  {assignee_text}")
-            person_lbl.setFont(QFont("DejaVu Sans", 16, FONT_BOLD))
+            person_lbl.setFont(QFont("DejaVu Sans", 13, FONT_BOLD))
             person_lbl.setStyleSheet("""
-                color: #153359;
-                background-color: #e8f2ff;
-                border-radius: 16px;
-                padding: 10px 14px;
+                color: #123a26;
+                background-color: #e8f5eb;
+                border-radius: 12px;
+                padding: 8px 10px;
             """)
 
             time_lbl = QLabel(f"DUE  {due_text}")
-            time_lbl.setFont(QFont("DejaVu Sans", 16, FONT_BOLD))
+            time_lbl.setFont(QFont("DejaVu Sans", 13, FONT_BOLD))
             time_lbl.setStyleSheet("""
-                color: #153359;
-                background-color: #eef8f1;
-                border-radius: 16px;
-                padding: 10px 14px;
+                color: #123a26;
+                background-color: #f1f7e8;
+                border-radius: 12px;
+                padding: 8px 10px;
             """)
 
-            info_layout.addWidget(person_lbl)
-            info_layout.addStretch()
-            info_layout.addWidget(time_lbl)
+            info_layout.addWidget(person_lbl, 1)
+            info_layout.addWidget(time_lbl, 1)
             layout.addLayout(info_layout)
 
 
@@ -147,9 +146,9 @@ class EmptyStateCard(QFrame):
         self.setStyleSheet(f"""
             QFrame#emptyStateCard {{
                 background-color: rgba(255, 255, 255, 0.08);
-                border: 3px dashed rgba(255, 255, 255, 0.24);
-                border-left: 12px solid {accent};
-                border-radius: 24px;
+                border: 2px dashed rgba(214, 247, 222, 0.36);
+                border-left: 10px solid {accent};
+                border-radius: 18px;
             }}
             QLabel {{
                 background: transparent;
@@ -158,18 +157,18 @@ class EmptyStateCard(QFrame):
         """)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 22, 24, 22)
-        layout.setSpacing(10)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(8)
 
         title_lbl = QLabel(title)
-        title_lbl.setFont(QFont("DejaVu Sans", 22, FONT_BOLD))
+        title_lbl.setFont(QFont("DejaVu Sans", 18, FONT_BOLD))
         title_lbl.setStyleSheet("color: #ffffff;")
         title_lbl.setWordWrap(True)
         layout.addWidget(title_lbl)
 
         message_lbl = QLabel(message)
-        message_lbl.setFont(QFont("DejaVu Sans", 17, FONT_DEMIBOLD))
-        message_lbl.setStyleSheet("color: #d8e9ff; line-height: 1.35;")
+        message_lbl.setFont(QFont("DejaVu Sans", 14, FONT_DEMIBOLD))
+        message_lbl.setStyleSheet("color: #d9f5df;")
         message_lbl.setWordWrap(True)
         layout.addWidget(message_lbl)
 
@@ -180,6 +179,7 @@ class PiDisplay(QMainWindow):
         self.setWindowTitle("Department Noticeboard")
         self.showFullScreen()
         self.server_url = os.environ.get("NOTICEBOARD_API_URL", "http://127.0.0.1:5000/api")
+        self.scroll_states = {}
 
         self.init_ui()
 
@@ -191,6 +191,10 @@ class PiDisplay(QMainWindow):
         self.clock_timer.timeout.connect(self.update_clock)
         self.clock_timer.start(1000)
 
+        self.auto_scroll_timer = QTimer()
+        self.auto_scroll_timer.timeout.connect(self.advance_auto_scroll)
+        self.auto_scroll_timer.start(80)
+
         self.refresh_data()
 
     def init_ui(self):
@@ -200,23 +204,24 @@ class PiDisplay(QMainWindow):
 
         palette = self.palette()
         gradient = QLinearGradient(0, 0, 0, 900)
-        gradient.setColorAt(0.0, QColor("#2d78d2"))
-        gradient.setColorAt(0.38, QColor("#103e82"))
-        gradient.setColorAt(1.0, QColor("#08162d"))
+        gradient.setColorAt(0.0, QColor("#56d37f"))
+        gradient.setColorAt(0.38, QColor("#157c4f"))
+        gradient.setColorAt(0.72, QColor("#0d5a38"))
+        gradient.setColorAt(1.0, QColor("#042515"))
         palette.setBrush(PALETTE_WINDOW, QBrush(gradient))
         self.setPalette(palette)
 
         self.main_layout = QVBoxLayout(central)
-        self.main_layout.setContentsMargins(38, 32, 38, 38)
-        self.main_layout.setSpacing(24)
+        self.main_layout.setContentsMargins(24, 20, 24, 24)
+        self.main_layout.setSpacing(16)
 
         header_frame = QFrame()
         header_frame.setObjectName("headerPanel")
         header_frame.setStyleSheet("""
             QFrame#headerPanel {
-                background-color: rgba(5, 20, 43, 0.38);
-                border: 2px solid rgba(255, 255, 255, 0.16);
-                border-radius: 30px;
+                background-color: rgba(4, 28, 16, 0.36);
+                border: 2px solid rgba(221, 248, 228, 0.16);
+                border-radius: 24px;
             }
             QLabel {
                 background: transparent;
@@ -225,26 +230,26 @@ class PiDisplay(QMainWindow):
         """)
 
         header = QHBoxLayout(header_frame)
-        header.setContentsMargins(28, 22, 28, 22)
-        header.setSpacing(24)
+        header.setContentsMargins(22, 16, 22, 16)
+        header.setSpacing(18)
 
         title_stack = QVBoxLayout()
-        title_stack.setSpacing(8)
+        title_stack.setSpacing(6)
 
         self.title_label = QLabel("DEPARTMENT NOTICEBOARD")
-        self.title_label.setFont(QFont("DejaVu Sans", 48, FONT_BOLD))
+        self.title_label.setFont(QFont("DejaVu Sans", 38, FONT_BOLD))
         self.title_label.setStyleSheet("color: white;")
         title_stack.addWidget(self.title_label)
 
-        self.subtitle_label = QLabel("LIVE UPDATES FOR NOTICES AND TASKS")
-        self.subtitle_label.setFont(QFont("DejaVu Sans", 18, FONT_DEMIBOLD))
-        self.subtitle_label.setStyleSheet("color: #d7ebff;")
+        self.subtitle_label = QLabel("GREEN ROOM VIEW FOR LIVE NOTICES AND TASKS")
+        self.subtitle_label.setFont(QFont("DejaVu Sans", 14, FONT_DEMIBOLD))
+        self.subtitle_label.setStyleSheet("color: #d8f3de;")
         title_stack.addWidget(self.subtitle_label)
 
         self.status_label = QLabel()
         self.status_label.setAlignment(ALIGN_CENTER)
-        self.status_label.setMinimumWidth(170)
-        self.status_label.setFont(QFont("DejaVu Sans", 14, FONT_BOLD))
+        self.status_label.setMinimumWidth(144)
+        self.status_label.setFont(QFont("DejaVu Sans", 11, FONT_BOLD))
         title_stack.addWidget(self.status_label, 0, ALIGN_TOP)
 
         header.addLayout(title_stack, 1)
@@ -255,17 +260,17 @@ class PiDisplay(QMainWindow):
         clock_panel.setStyleSheet("""
             QFrame#clockPanel {
                 background-color: rgba(255, 255, 255, 0.14);
-                border: 2px solid rgba(255, 255, 255, 0.18);
-                border-radius: 24px;
+                border: 2px solid rgba(222, 248, 228, 0.18);
+                border-radius: 18px;
             }
         """)
 
         clock_layout = QVBoxLayout(clock_panel)
-        clock_layout.setContentsMargins(20, 16, 20, 16)
+        clock_layout.setContentsMargins(16, 12, 16, 12)
 
         self.clock_label = QLabel()
         self.clock_label.setAlignment(ALIGN_CENTER)
-        self.clock_label.setFont(QFont("DejaVu Sans", 32, FONT_BOLD))
+        self.clock_label.setFont(QFont("DejaVu Sans", 24, FONT_BOLD))
         self.clock_label.setStyleSheet("color: #ffffff;")
         clock_layout.addWidget(self.clock_label)
 
@@ -273,20 +278,25 @@ class PiDisplay(QMainWindow):
         self.main_layout.addWidget(header_frame)
 
         content_layout = QHBoxLayout()
-        content_layout.setSpacing(24)
+        content_layout.setSpacing(16)
 
-        notices_panel, self.notices_layout, self.notices_count_label = self.create_section_panel(
-            "NOTICES", "#49c2ff"
+        notices_panel, self.notices_area, self.notices_layout, self.notices_count_label = self.create_section_panel(
+            "NOTICES", "#2bbf6c"
         )
-        tasks_panel, self.tasks_layout, self.tasks_count_label = self.create_section_panel(
-            "TASKS", "#65e886"
+        tasks_panel, self.tasks_area, self.tasks_layout, self.tasks_count_label = self.create_section_panel(
+            "TASKS", "#1f9a57"
         )
 
         content_layout.addWidget(notices_panel, 1)
         content_layout.addWidget(tasks_panel, 1)
         self.main_layout.addLayout(content_layout)
 
-        self.set_connection_status("SYNCING", "#ffbf47")
+        self.scroll_states = {
+            "notices": {"area": self.notices_area, "pause_ticks": 18, "at_bottom": False, "step": 2},
+            "tasks": {"area": self.tasks_area, "pause_ticks": 18, "at_bottom": False, "step": 2},
+        }
+
+        self.set_connection_status("SYNCING", "#d7ac45")
         self.show_placeholder_cards()
 
     def update_clock(self):
@@ -297,9 +307,9 @@ class PiDisplay(QMainWindow):
         section_frame.setObjectName("sectionPanel")
         section_frame.setStyleSheet("""
             QFrame#sectionPanel {
-                background-color: rgba(6, 22, 46, 0.34);
-                border: 2px solid rgba(255, 255, 255, 0.14);
-                border-radius: 30px;
+                background-color: rgba(4, 27, 16, 0.34);
+                border: 2px solid rgba(220, 247, 227, 0.14);
+                border-radius: 24px;
             }
             QLabel {
                 background: transparent;
@@ -310,14 +320,15 @@ class PiDisplay(QMainWindow):
                 border: none;
             }
             QScrollBar:vertical {
-                background: transparent;
-                width: 12px;
-                margin: 8px 0 8px 0;
+                background: rgba(255, 255, 255, 0.08);
+                width: 10px;
+                margin: 4px 0 4px 0;
+                border-radius: 5px;
             }
             QScrollBar::handle:vertical {
-                background: rgba(255, 255, 255, 0.28);
-                border-radius: 6px;
-                min-height: 48px;
+                background: rgba(189, 239, 198, 0.7);
+                border-radius: 5px;
+                min-height: 40px;
             }
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                 height: 0px;
@@ -325,20 +336,20 @@ class PiDisplay(QMainWindow):
         """)
 
         outer_layout = QVBoxLayout(section_frame)
-        outer_layout.setContentsMargins(22, 20, 22, 22)
-        outer_layout.setSpacing(16)
+        outer_layout.setContentsMargins(16, 14, 16, 16)
+        outer_layout.setSpacing(12)
 
         title_row = QHBoxLayout()
-        title_row.setSpacing(14)
+        title_row.setSpacing(10)
 
         title_label = QLabel(title)
-        title_label.setFont(QFont("DejaVu Sans", 26, FONT_BOLD))
+        title_label.setFont(QFont("DejaVu Sans", 22, FONT_BOLD))
         title_label.setStyleSheet(f"""
             QLabel {{
                 color: white;
                 background-color: {accent};
-                border-radius: 18px;
-                padding: 8px 18px;
+                border-radius: 14px;
+                padding: 7px 16px;
             }}
         """)
         title_row.addWidget(title_label)
@@ -346,15 +357,15 @@ class PiDisplay(QMainWindow):
 
         count_label = QLabel("0")
         count_label.setAlignment(ALIGN_CENTER)
-        count_label.setMinimumWidth(54)
-        count_label.setFont(QFont("DejaVu Sans", 16, FONT_BOLD))
+        count_label.setMinimumWidth(44)
+        count_label.setFont(QFont("DejaVu Sans", 14, FONT_BOLD))
         count_label.setStyleSheet("""
             QLabel {
                 color: #ffffff;
                 background-color: rgba(255, 255, 255, 0.14);
-                border: 2px solid rgba(255, 255, 255, 0.18);
-                border-radius: 16px;
-                padding: 7px 12px;
+                border: 2px solid rgba(220, 247, 227, 0.18);
+                border-radius: 14px;
+                padding: 6px 10px;
             }
         """)
         title_row.addWidget(count_label)
@@ -368,14 +379,14 @@ class PiDisplay(QMainWindow):
         container.setStyleSheet("background: transparent;")
 
         container_layout = QVBoxLayout(container)
-        container_layout.setContentsMargins(0, 4, 0, 4)
-        container_layout.setSpacing(16)
+        container_layout.setContentsMargins(0, 2, 0, 2)
+        container_layout.setSpacing(12)
         container_layout.setAlignment(ALIGN_TOP)
 
         scroll_area.setWidget(container)
         outer_layout.addWidget(scroll_area)
 
-        return section_frame, container_layout, count_label
+        return section_frame, scroll_area, container_layout, count_label
 
     def set_connection_status(self, text, accent):
         self.status_label.setText(text)
@@ -383,8 +394,8 @@ class PiDisplay(QMainWindow):
             QLabel {{
                 color: #ffffff;
                 background-color: {accent};
-                border-radius: 16px;
-                padding: 8px 16px;
+                border-radius: 14px;
+                padding: 6px 12px;
             }}
         """)
 
@@ -397,6 +408,48 @@ class PiDisplay(QMainWindow):
     def show_placeholder_cards(self):
         self.render_notices([])
         self.render_tasks([])
+
+    def reset_scroll_area(self, name):
+        state = self.scroll_states.get(name)
+        if not state:
+            return
+
+        scrollbar = state["area"].verticalScrollBar()
+        scrollbar.setValue(0)
+        state["pause_ticks"] = 18
+        state["at_bottom"] = False
+
+    def queue_scroll_reset(self, name):
+        QTimer.singleShot(0, lambda key=name: self.reset_scroll_area(key))
+
+    def advance_auto_scroll(self):
+        for state in self.scroll_states.values():
+            scrollbar = state["area"].verticalScrollBar()
+            maximum = scrollbar.maximum()
+
+            if maximum <= 0:
+                if scrollbar.value() != 0:
+                    scrollbar.setValue(0)
+                state["pause_ticks"] = 18
+                state["at_bottom"] = False
+                continue
+
+            if state["pause_ticks"] > 0:
+                state["pause_ticks"] -= 1
+                continue
+
+            if state["at_bottom"]:
+                scrollbar.setValue(0)
+                state["at_bottom"] = False
+                state["pause_ticks"] = 18
+                continue
+
+            next_value = min(maximum, scrollbar.value() + state["step"])
+            scrollbar.setValue(next_value)
+
+            if next_value >= maximum:
+                state["at_bottom"] = True
+                state["pause_ticks"] = 36
 
     def render_notices(self, notices):
         self.clear_layout(self.notices_layout)
@@ -411,11 +464,12 @@ class PiDisplay(QMainWindow):
                 EmptyStateCard(
                     "No notices right now",
                     "New notices will appear here automatically as soon as they are added.",
-                    "#49c2ff",
+                    "#2bbf6c",
                 )
             )
 
         self.notices_layout.addStretch(1)
+        self.queue_scroll_reset("notices")
 
     def render_tasks(self, tasks):
         self.clear_layout(self.tasks_layout)
@@ -436,12 +490,13 @@ class PiDisplay(QMainWindow):
             self.tasks_layout.addWidget(
                 EmptyStateCard(
                     "No tasks queued",
-                    "Tasks assigned from the manager app will show here in large, easy-to-read cards.",
-                    "#65e886",
+                    "Tasks assigned from the manager app will show here automatically.",
+                    "#1f9a57",
                 )
             )
 
         self.tasks_layout.addStretch(1)
+        self.queue_scroll_reset("tasks")
 
     def refresh_data(self):
         try:
@@ -457,13 +512,13 @@ class PiDisplay(QMainWindow):
                 self.render_tasks(tasks_response.json())
 
             if notices_ok and tasks_ok:
-                self.set_connection_status("LIVE", "#2ecc71")
+                self.set_connection_status("LIVE", "#1f9a57")
             elif notices_ok or tasks_ok:
-                self.set_connection_status("PARTIAL UPDATE", "#ffbf47")
+                self.set_connection_status("PARTIAL UPDATE", "#d7ac45")
             else:
-                self.set_connection_status("SERVER ERROR", "#ff6154")
+                self.set_connection_status("SERVER ERROR", "#b94f3e")
         except Exception as error:
-            self.set_connection_status("OFFLINE", "#ff6154")
+            self.set_connection_status("OFFLINE", "#b94f3e")
             print(f"Refresh error: {error}")
 
 
