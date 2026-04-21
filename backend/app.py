@@ -1,24 +1,59 @@
-from flask import Flask, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from flask_cors import CORS
-from datetime import datetime
 import os
 import subprocess
+from datetime import datetime, timedelta
+
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import inspect, text
 
 app = Flask(__name__)
 CORS(app)
 
 # Database configuration
-db_path = os.path.join(os.path.dirname(__file__), 'noticeboard.db')
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db_path = os.path.join(os.path.dirname(__file__), "noticeboard.db")
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
 
+def format_duration(total_seconds):
+    total_seconds = max(0, int(total_seconds))
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+def normalize_text(value):
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def normalize_optional_text(value):
+    text_value = normalize_text(value)
+    return text_value or None
+
+
+def normalize_countdown_seconds(value):
+    if value in (None, "", 0, "0"):
+        return None
+
+    try:
+        countdown_seconds = int(value)
+    except (TypeError, ValueError):
+        return None
+
+    if countdown_seconds <= 0:
+        return None
+
+    return countdown_seconds
+
+
 def request_display_refresh():
-    refresh_service = os.environ.get('NOTICEBOARD_REFRESH_SERVICE', 'noticeboard-refresh.service')
-    systemctl_bin = os.environ.get('NOTICEBOARD_SYSTEMCTL', '/usr/bin/systemctl')
-    refresh_command = ['sudo', '-n', systemctl_bin, 'start', refresh_service]
+    refresh_service = os.environ.get("NOTICEBOARD_REFRESH_SERVICE", "noticeboard-refresh.service")
+    systemctl_bin = os.environ.get("NOTICEBOARD_SYSTEMCTL", "/usr/bin/systemctl")
+    refresh_command = ["sudo", "-n", systemctl_bin, "start", refresh_service]
 
     try:
         subprocess.run(
@@ -29,109 +64,258 @@ def request_display_refresh():
             timeout=10,
         )
     except FileNotFoundError as exc:
-        return jsonify({'error': f'Could not run refresh command: {exc}'}), 500
+        return jsonify({"error": f"Could not run refresh command: {exc}"}), 500
     except subprocess.TimeoutExpired:
-        return jsonify({'error': 'Timed out while starting the Pi refresh service.'}), 500
+        return jsonify({"error": "Timed out while starting the Pi refresh service."}), 500
     except subprocess.CalledProcessError as exc:
         error_message = (exc.stderr or exc.stdout or str(exc)).strip()
-        return jsonify({'error': f'Could not start the Pi refresh service: {error_message}'}), 500
+        return jsonify({"error": f"Could not start the Pi refresh service: {error_message}"}), 500
 
-    return jsonify({'message': 'Pi display refresh requested. The Pi will pull updates if any are available.'}), 202
+    return (
+        jsonify({"message": "Pi display refresh requested. The Pi will pull updates if any are available."}),
+        202,
+    )
 
-# Models
+
 class Notice(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    priority = db.Column(db.String(20), default='Medium') # High, Medium, Low
+    priority = db.Column(db.String(20), default="Medium")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     def to_dict(self):
         return {
-            'id': self.id,
-            'title': self.title,
-            'content': self.content,
-            'priority': self.priority,
-            'created_at': self.created_at.isoformat()
+            "id": self.id,
+            "title": self.title,
+            "content": self.content,
+            "priority": self.priority,
+            "created_at": self.created_at.isoformat(),
         }
+
+
+class Assignee(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "created_at": self.created_at.isoformat(),
+        }
+
 
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
     assignee = db.Column(db.String(50), nullable=False)
     due_time = db.Column(db.String(50))
-    priority = db.Column(db.String(20), default='Medium')
-    status = db.Column(db.String(20), default='Pending')
-    
-    def to_dict(self):
+    priority = db.Column(db.String(20), default="Medium")
+    status = db.Column(db.String(20), default="Pending")
+    countdown_seconds = db.Column(db.Integer)
+    timer_end_at = db.Column(db.DateTime)
+
+    def timer_snapshot(self):
+        if not self.timer_end_at:
+            return {
+                "timer_elapsed": False,
+                "timer_remaining_seconds": None,
+                "timer_end_at": None,
+                "timer_label": None,
+            }
+
+        remaining_seconds = int((self.timer_end_at - datetime.utcnow()).total_seconds())
+        timer_elapsed = remaining_seconds <= 0
+
+        if timer_elapsed:
+            timer_remaining_seconds = 0
+            timer_label = "TIMER ELAPSED"
+        else:
+            timer_remaining_seconds = remaining_seconds
+            timer_label = f"TIMER {format_duration(timer_remaining_seconds)}"
+
         return {
-            'id': self.id,
-            'title': self.title,
-            'assignee': self.assignee,
-            'due_time': self.due_time,
-            'priority': self.priority,
-            'status': self.status
+            "timer_elapsed": timer_elapsed,
+            "timer_remaining_seconds": timer_remaining_seconds,
+            "timer_end_at": self.timer_end_at.isoformat(),
+            "timer_label": timer_label,
         }
 
-# Routes
-@app.route('/api/notices', methods=['GET'])
+    def to_dict(self):
+        snapshot = self.timer_snapshot()
+        return {
+            "id": self.id,
+            "title": self.title,
+            "assignee": self.assignee,
+            "due_time": self.due_time,
+            "priority": self.priority,
+            "status": self.status,
+            "countdown_seconds": self.countdown_seconds,
+            **snapshot,
+        }
+
+
+def ensure_assignee(name):
+    assignee_name = normalize_text(name)
+    if not assignee_name:
+        return None
+
+    existing = Assignee.query.filter_by(name=assignee_name).first()
+    if existing:
+        return existing
+
+    assignee = Assignee(name=assignee_name)
+    db.session.add(assignee)
+    db.session.flush()
+    return assignee
+
+
+def initialize_database():
+    db.create_all()
+
+    inspector = inspect(db.engine)
+    task_columns = {column["name"] for column in inspector.get_columns("task")}
+    pending_alters = []
+
+    if "countdown_seconds" not in task_columns:
+        pending_alters.append("ALTER TABLE task ADD COLUMN countdown_seconds INTEGER")
+    if "timer_end_at" not in task_columns:
+        pending_alters.append("ALTER TABLE task ADD COLUMN timer_end_at DATETIME")
+
+    for statement in pending_alters:
+        db.session.execute(text(statement))
+
+    if pending_alters:
+        db.session.commit()
+
+    # Backfill assignees from existing tasks so saved names appear immediately.
+    task_assignees = db.session.execute(
+        text("SELECT DISTINCT assignee FROM task WHERE assignee IS NOT NULL AND TRIM(assignee) != ''")
+    ).fetchall()
+    for row in task_assignees:
+        ensure_assignee(row[0])
+
+    db.session.commit()
+
+
+@app.route("/api/notices", methods=["GET"])
 def get_notices():
     notices = Notice.query.order_by(Notice.created_at.desc()).all()
-    return jsonify([n.to_dict() for n in notices])
+    return jsonify([notice.to_dict() for notice in notices])
 
-@app.route('/api/notices', methods=['POST'])
+
+@app.route("/api/notices", methods=["POST"])
 def add_notice():
-    data = request.json
+    data = request.json or {}
+    title = normalize_text(data.get("title"))
+    content = normalize_text(data.get("content"))
+
+    if not title or not content:
+        return jsonify({"error": "Title and content are required."}), 400
+
     new_notice = Notice(
-        title=data['title'],
-        content=data['content'],
-        priority=data.get('priority', 'Medium')
+        title=title,
+        content=content,
+        priority=normalize_text(data.get("priority")) or "Medium",
     )
     db.session.add(new_notice)
     db.session.commit()
     return jsonify(new_notice.to_dict()), 201
 
-@app.route('/api/notices/<int:id>', methods=['DELETE'])
+
+@app.route("/api/notices/<int:id>", methods=["DELETE"])
 def delete_notice(id):
     notice = Notice.query.get_or_404(id)
     db.session.delete(notice)
     db.session.commit()
-    return '', 204
+    return "", 204
 
-@app.route('/api/tasks', methods=['GET'])
+
+@app.route("/api/assignees", methods=["GET"])
+def get_assignees():
+    assignees = Assignee.query.order_by(Assignee.name.asc()).all()
+    return jsonify([assignee.to_dict() for assignee in assignees])
+
+
+@app.route("/api/assignees", methods=["POST"])
+def add_assignee():
+    data = request.json or {}
+    name = normalize_text(data.get("name"))
+    if not name:
+        return jsonify({"error": "Assignee name is required."}), 400
+
+    assignee = Assignee.query.filter_by(name=name).first()
+    if assignee:
+        return jsonify(assignee.to_dict()), 200
+
+    assignee = Assignee(name=name)
+    db.session.add(assignee)
+    db.session.commit()
+    return jsonify(assignee.to_dict()), 201
+
+
+@app.route("/api/assignees/<int:id>", methods=["DELETE"])
+def delete_assignee(id):
+    assignee = Assignee.query.get_or_404(id)
+    db.session.delete(assignee)
+    db.session.commit()
+    return "", 204
+
+
+@app.route("/api/tasks", methods=["GET"])
 def get_tasks():
-    tasks = Task.query.all()
-    return jsonify([t.to_dict() for t in tasks])
+    tasks = Task.query.order_by(Task.id.desc()).all()
+    return jsonify([task.to_dict() for task in tasks])
 
-@app.route('/api/tasks', methods=['POST'])
+
+@app.route("/api/tasks", methods=["POST"])
 def add_task():
-    data = request.json
+    data = request.json or {}
+    title = normalize_text(data.get("title"))
+    assignee_name = normalize_text(data.get("assignee"))
+
+    if not title or not assignee_name:
+        return jsonify({"error": "Title and assignee are required."}), 400
+
+    countdown_seconds = normalize_countdown_seconds(data.get("countdown_seconds"))
+    timer_end_at = None
+    if countdown_seconds:
+        timer_end_at = datetime.utcnow() + timedelta(seconds=countdown_seconds)
+
     new_task = Task(
-        title=data['title'],
-        assignee=data['assignee'],
-        due_time=data.get('due_time'),
-        priority=data.get('priority', 'Medium')
+        title=title,
+        assignee=assignee_name,
+        due_time=normalize_optional_text(data.get("due_time")),
+        priority=normalize_text(data.get("priority")) or "Medium",
+        countdown_seconds=countdown_seconds,
+        timer_end_at=timer_end_at,
     )
     db.session.add(new_task)
+    ensure_assignee(assignee_name)
     db.session.commit()
     return jsonify(new_task.to_dict()), 201
 
-@app.route('/api/tasks/<int:id>', methods=['DELETE'])
+
+@app.route("/api/tasks/<int:id>", methods=["DELETE"])
 def delete_task(id):
     task = Task.query.get_or_404(id)
     db.session.delete(task)
     db.session.commit()
-    return '', 204
+    return "", 204
 
 
-@app.route('/api/admin/restart-display', methods=['POST'])
+@app.route("/api/admin/restart-display", methods=["POST"])
 def restart_display():
     return request_display_refresh()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     with app.app_context():
-        db.create_all()
-    host = os.environ.get('NOTICEBOARD_HOST', '0.0.0.0')
-    port = int(os.environ.get('NOTICEBOARD_PORT', '5000'))
-    debug = os.environ.get('FLASK_DEBUG', '').lower() in {'1', 'true', 'yes'}
+        initialize_database()
+
+    host = os.environ.get("NOTICEBOARD_HOST", "0.0.0.0")
+    port = int(os.environ.get("NOTICEBOARD_PORT", "5000"))
+    debug = os.environ.get("FLASK_DEBUG", "").lower() in {"1", "true", "yes"}
     app.run(host=host, port=port, debug=debug, use_reloader=False)

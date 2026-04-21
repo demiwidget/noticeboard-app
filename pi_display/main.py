@@ -49,7 +49,17 @@ else:
 
 
 class Card(QFrame):
-    def __init__(self, title, content, priority, type="notice", assignee=None, time=None):
+    def __init__(
+        self,
+        title,
+        content,
+        priority,
+        type="notice",
+        assignee=None,
+        due_text=None,
+        timer_label=None,
+        timer_elapsed=False,
+    ):
         super().__init__()
         self.setObjectName("noticeCard")
         self.setFrameShape(STYLED_PANEL)
@@ -60,6 +70,8 @@ class Card(QFrame):
             "Low": {"accent": "#39a85d", "border": "#cce8d3", "badge": "#1f7d3f"},
         }
         style = priority_styles.get(priority, priority_styles["Low"])
+        if timer_elapsed:
+            style = {"accent": "#f0625f", "border": "#f5c5c3", "badge": "#c0392b"}
 
         self.setStyleSheet(f"""
             QFrame#noticeCard {{
@@ -87,7 +99,8 @@ class Card(QFrame):
         title_lbl.setWordWrap(True)
         top_row.addWidget(title_lbl, 1)
 
-        priority_lbl = QLabel(priority.upper())
+        badge_text = "ALERT" if timer_elapsed else priority.upper()
+        priority_lbl = QLabel(badge_text)
         priority_lbl.setAlignment(ALIGN_CENTER)
         priority_lbl.setMinimumWidth(92)
         priority_lbl.setFont(QFont("DejaVu Sans", 11, FONT_BOLD))
@@ -108,34 +121,36 @@ class Card(QFrame):
             content_lbl.setStyleSheet("color: #2c4a39;")
             content_lbl.setWordWrap(True)
             layout.addWidget(content_lbl)
-        else:
-            info_layout = QHBoxLayout()
-            info_layout.setSpacing(10)
+            return
 
-            assignee_text = assignee or "Unassigned"
-            due_text = time or "No due time"
-
-            person_lbl = QLabel(f"ASSIGNEE  {assignee_text}")
-            person_lbl.setFont(QFont("DejaVu Sans", 13, FONT_BOLD))
-            person_lbl.setStyleSheet("""
-                color: #123a26;
-                background-color: #e8f5eb;
-                border-radius: 12px;
-                padding: 8px 10px;
+        def build_chip(text, background, foreground="#123a26"):
+            chip = QLabel(text)
+            chip.setFont(QFont("DejaVu Sans", 12, FONT_BOLD))
+            chip.setStyleSheet(f"""
+                QLabel {{
+                    color: {foreground};
+                    background-color: {background};
+                    border-radius: 12px;
+                    padding: 8px 10px;
+                }}
             """)
+            return chip
 
-            time_lbl = QLabel(f"DUE  {due_text}")
-            time_lbl.setFont(QFont("DejaVu Sans", 13, FONT_BOLD))
-            time_lbl.setStyleSheet("""
-                color: #123a26;
-                background-color: #f1f7e8;
-                border-radius: 12px;
-                padding: 8px 10px;
-            """)
+        row_one = QHBoxLayout()
+        row_one.setSpacing(10)
+        row_one.addWidget(build_chip(f"ASSIGNEE  {assignee or 'Unassigned'}", "#e8f5eb"), 1)
 
-            info_layout.addWidget(person_lbl, 1)
-            info_layout.addWidget(time_lbl, 1)
-            layout.addLayout(info_layout)
+        if timer_label:
+            timer_background = "#ffe9e7" if timer_elapsed else "#e2f6e8"
+            timer_foreground = "#b63b34" if timer_elapsed else "#14532d"
+            row_one.addWidget(build_chip(timer_label, timer_background, timer_foreground), 1)
+
+        layout.addLayout(row_one)
+
+        if due_text:
+            row_two = QHBoxLayout()
+            row_two.addWidget(build_chip(f"DUE  {due_text}", "#f1f7e8"))
+            layout.addLayout(row_two)
 
 
 class EmptyStateCard(QFrame):
@@ -482,8 +497,10 @@ class PiDisplay(QMainWindow):
                     "",
                     task["priority"],
                     type="task",
-                    assignee=task["assignee"],
-                    time=task["due_time"],
+                    assignee=task.get("assignee"),
+                    due_text=task.get("due_time"),
+                    timer_label=task.get("timer_label"),
+                    timer_elapsed=task.get("timer_elapsed", False),
                 )
                 self.tasks_layout.addWidget(card)
         else:
