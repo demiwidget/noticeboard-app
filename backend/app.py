@@ -15,28 +15,28 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 
-def restart_display_service():
-    service_name = os.environ.get('NOTICEBOARD_DISPLAY_SERVICE', 'noticeboard-display.service')
+def request_display_refresh():
+    refresh_service = os.environ.get('NOTICEBOARD_REFRESH_SERVICE', 'noticeboard-refresh.service')
     systemctl_bin = os.environ.get('NOTICEBOARD_SYSTEMCTL', '/usr/bin/systemctl')
-    restart_command = ['sudo', '-n', systemctl_bin, 'restart', service_name]
+    refresh_command = ['sudo', '-n', systemctl_bin, 'start', refresh_service]
 
     try:
         subprocess.run(
-            restart_command,
+            refresh_command,
             check=True,
             capture_output=True,
             text=True,
             timeout=10,
         )
     except FileNotFoundError as exc:
-        return jsonify({'error': f'Could not run restart command: {exc}'}), 500
+        return jsonify({'error': f'Could not run refresh command: {exc}'}), 500
     except subprocess.TimeoutExpired:
-        return jsonify({'error': 'Timed out while restarting the display service.'}), 500
+        return jsonify({'error': 'Timed out while starting the Pi refresh service.'}), 500
     except subprocess.CalledProcessError as exc:
         error_message = (exc.stderr or exc.stdout or str(exc)).strip()
-        return jsonify({'error': f'Could not restart the display service: {error_message}'}), 500
+        return jsonify({'error': f'Could not start the Pi refresh service: {error_message}'}), 500
 
-    return jsonify({'message': 'display restart requested'}), 202
+    return jsonify({'message': 'Pi display refresh requested. The Pi will pull updates if any are available.'}), 202
 
 # Models
 class Notice(db.Model):
@@ -126,7 +126,7 @@ def delete_task(id):
 
 @app.route('/api/admin/restart-display', methods=['POST'])
 def restart_display():
-    return restart_display_service()
+    return request_display_refresh()
 
 if __name__ == '__main__':
     with app.app_context():

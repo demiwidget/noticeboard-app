@@ -20,6 +20,7 @@ BACKEND_DIR="$APP_DIR/backend"
 DISPLAY_DIR="$APP_DIR/pi_display"
 PYTHON_BIN="/usr/bin/python3"
 SYSTEMCTL_BIN="$(command -v systemctl)"
+REFRESH_SERVICE_NAME="noticeboard-refresh.service"
 
 if [[ ! -f "$BACKEND_DIR/app.py" || ! -f "$DISPLAY_DIR/main.py" ]]; then
     fail "Cannot find backend/app.py and pi_display/main.py. Run this from the repository's scripts directory."
@@ -102,8 +103,8 @@ ENVFILE
 
 log "Writing restart permission for the backend..."
 "${SUDO[@]}" tee /etc/sudoers.d/noticeboard-display-restart >/dev/null <<SUDOERS
-# Allow the noticeboard backend to restart only the Pi display service.
-$APP_USER ALL=(root) NOPASSWD: $SYSTEMCTL_BIN restart noticeboard-display.service
+# Allow the noticeboard backend to trigger only the Pi refresh service.
+$APP_USER ALL=(root) NOPASSWD: $SYSTEMCTL_BIN start $REFRESH_SERVICE_NAME
 SUDOERS
 "${SUDO[@]}" chmod 440 /etc/sudoers.d/noticeboard-display-restart
 if command -v visudo >/dev/null 2>&1; then
@@ -124,7 +125,7 @@ WorkingDirectory=$BACKEND_DIR
 Environment=NOTICEBOARD_HOST=0.0.0.0
 Environment=NOTICEBOARD_PORT=5000
 Environment=NOTICEBOARD_SYSTEMCTL=$SYSTEMCTL_BIN
-Environment=NOTICEBOARD_DISPLAY_SERVICE=noticeboard-display.service
+Environment=NOTICEBOARD_REFRESH_SERVICE=$REFRESH_SERVICE_NAME
 ExecStart=$PYTHON_BIN "$BACKEND_DIR/app.py"
 Restart=always
 RestartSec=5
@@ -155,6 +156,19 @@ RestartSec=10
 
 [Install]
 WantedBy=graphical.target
+SERVICE
+
+"${SUDO[@]}" tee /etc/systemd/system/$REFRESH_SERVICE_NAME >/dev/null <<SERVICE
+[Unit]
+Description=Noticeboard Display Refresh
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/default/noticeboard
+WorkingDirectory=$APP_DIR
+ExecStart=/usr/bin/env bash $APP_DIR/scripts/update_pi.sh --restart-display
 SERVICE
 
 "${SUDO[@]}" tee /etc/systemd/system/noticeboard-update.service >/dev/null <<SERVICE

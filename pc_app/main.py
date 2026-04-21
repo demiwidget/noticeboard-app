@@ -270,7 +270,7 @@ class NoticeBoardAdmin(QMainWindow):
         reply = QMessageBox.question(
             self,
             "Restart Pi Display",
-            "Restart the Raspberry Pi display app now?",
+            "Check GitHub for Pi updates and restart the display app now?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -281,16 +281,19 @@ class NoticeBoardAdmin(QMainWindow):
         try:
             response = requests.post(f"{self.server_url}/admin/restart-display", timeout=5)
             if response.status_code == 202:
-                message = self.response_message(response, "Pi display restart requested.")
-                QMessageBox.information(self, "Restart Requested", message)
+                message = self.response_message(
+                    response,
+                    "Pi display refresh requested. The Pi will pull updates if any are available.",
+                )
+                QMessageBox.information(self, "Refresh Requested", message)
             else:
                 message = self.response_message(
                     response,
-                    f"Could not restart the Pi display (HTTP {response.status_code}).",
+                    f"Could not refresh the Pi display (HTTP {response.status_code}).",
                 )
-                QMessageBox.critical(self, "Restart Failed", message)
+                QMessageBox.critical(self, "Refresh Failed", message)
         except requests.RequestException as e:
-            QMessageBox.critical(self, "Restart Failed", f"Could not reach the Pi backend: {e}")
+            QMessageBox.critical(self, "Refresh Failed", f"Could not reach the Pi backend: {e}")
         finally:
             self.restart_display_btn.setEnabled(True)
 

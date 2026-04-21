@@ -4,7 +4,7 @@ A modern, dual-application noticeboard system designed for a Raspberry Pi displa
 
 ## Features
 - **PC Management App**: Modern GUI to add/remove notices and tasks.
-- **Remote Display Restart**: The PC app can request a restart of the Raspberry Pi display service after updates.
+- **Remote Display Refresh**: The PC app can trigger a Raspberry Pi update check and refresh the display service after updates.
 - **Pi Display App**: Fullscreen, auto-refreshing dashboard with high-contrast, colorful cards.
 - **Priority System**: Color-coded notices and tasks (High, Medium, Low).
 - **Task Assignment**: Assign tasks to specific people with due times.
@@ -25,7 +25,7 @@ A modern, dual-application noticeboard system designed for a Raspberry Pi displa
 4. Make the install script executable: `chmod +x install_pi.sh`.
 5. Run the script: `./install_pi.sh`.
 6. The installer uses Raspberry Pi OS/Debian packages, writes systemd services with your actual username and clone path, then starts the backend and display.
-7. The installer also adds a tightly scoped sudoers rule so the backend can restart only `noticeboard-display.service` when asked by the PC app.
+7. The installer also adds a tightly scoped sudoers rule so the backend can start only the Pi refresh service when asked by the PC app.
 
 Useful Pi checks:
 
@@ -54,12 +54,12 @@ python pc_app\main.py
 ### 3. Auto Updates
 - **PC app**: When launched via `Noticeboard Manager.vbs`, the app checks Git for updates before starting. If the local repo has tracked file changes, the update is skipped to avoid overwriting them.
 - **Raspberry Pi**: Running `scripts/install_pi.sh` installs a `noticeboard-update.timer` systemd timer. It checks for repo updates every 6 hours, pulls them, reapplies the Pi install, and restarts the services.
-- **Pi display refresh after updates**: Use the `Restart Pi Display` button in the PC app to restart just the fullscreen Pi display after a Git-based update.
+- **Pi display refresh after updates**: Use the `Restart Pi Display` button in the PC app to check GitHub for Pi updates immediately and then refresh the fullscreen display.
 - **Network note**: The Pi display restart endpoint is intentionally open on the local network for this setup, so only devices you trust on the LAN should be able to reach the Pi backend.
 
 ## Usage
 - **Adding Notices**: Use the "Manage Notices" tab in the PC app.
 - **Assigning Tasks**: Use the "Assign Tasks" tab.
-- **Restarting The Pi Display**: Use the `Restart Pi Display` button in the PC app header after pushing an update to GitHub and letting the Pi pull it.
+- **Restarting The Pi Display**: Use the `Restart Pi Display` button in the PC app header after pushing an update to GitHub. The Pi will check for updates immediately and then refresh the display.
 - **Priorities**: High priority items appear in Red, Medium in Orange/Yellow, and Low in Blue/Green.
 - **Auto-Update**: The Pi display refreshes every 10 seconds to show new changes.

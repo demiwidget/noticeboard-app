@@ -82,7 +82,7 @@ Navigate to the `scripts` directory within the cloned repository and run the ins
     This script will:
     *   Install necessary Raspberry Pi OS/Debian packages (`python3-flask`, `python3-flask-sqlalchemy`, `python3-flask-cors`, `python3-requests`, and either `python3-pyqt6` or `python3-pyqt5`).
     *   Generate `noticeboard-backend.service` and `noticeboard-display.service` in `/etc/systemd/system/` with the correct username and project path.
-    *   Add a tightly scoped sudoers rule so the backend can restart only the Pi display service on request from the PC app.
+    *   Add a tightly scoped sudoers rule so the backend can start only the Pi refresh service on request from the PC app.
     *   Reload systemd, enable, and start both services.
 
 ### Verifying Services
@@ -144,7 +144,7 @@ Manual fallback:
 
 *   **PC app**: Launching via `Noticeboard Manager.vbs` checks the GitHub clone for updates before the app opens. If the local repo has tracked file changes, the update step is skipped to avoid overwriting local edits.
 *   **Raspberry Pi**: `install_pi.sh` now installs `noticeboard-update.timer`, which runs every 6 hours, checks for repo updates, pulls them, reruns the Pi installer in update mode, and restarts the backend and display services.
-*   **Restarting the Pi display after updates**: Use the `Restart Pi Display` button in the PC app header to restart only the fullscreen display service after an update has been pulled.
+*   **Restarting the Pi display after updates**: Use the `Restart Pi Display` button in the PC app header to check GitHub for updates immediately and then refresh the fullscreen display.
 *   **LAN access note**: The Pi display restart endpoint is intentionally open on the local network for this setup. Keep the Pi backend reachable only from devices you trust.
 *   **Manual Pi update**:
     ```bash
