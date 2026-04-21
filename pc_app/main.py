@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, QLineEdit, QTextEdit, 
                              QPushButton, QComboBox, QListWidget, QListWidgetItem,
                              QMessageBox, QTabWidget, QFrame)
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QSettings
 from PyQt6.QtGui import QFont, QColor, QIcon
 import qtawesome as qta
 
@@ -37,9 +37,11 @@ class ModernButton(QPushButton):
 class NoticeBoardAdmin(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.settings = QSettings("Demiwidget", "NoticeboardManager")
+        self.saved_server_host = self.settings.value("server_host", "localhost", type=str) or "localhost"
         self.setWindowTitle("Noticeboard Manager")
         self.setMinimumSize(900, 700)
-        self.server_url = "http://localhost:5000/api" # Default to localhost
+        self.server_url = self.build_server_url_from_host(self.saved_server_host)
         
         self.init_ui()
         self.setStyleSheet("""
@@ -120,7 +122,7 @@ class NoticeBoardAdmin(QMainWindow):
         self.server_input = QLineEdit()
         self.server_input.setPlaceholderText("Server IP (e.g., 192.168.1.100)")
         self.server_input.setFixedWidth(250)
-        self.server_input.setText("localhost")
+        self.server_input.setText(self.saved_server_host)
         header.addWidget(self.server_input)
         
         connect_btn = ModernButton("Connect", "#2ecc71", "fa5s.link")
@@ -245,14 +247,22 @@ class NoticeBoardAdmin(QMainWindow):
         layout.addLayout(list_container)
 
     def update_server_url(self):
-        self.server_url = self.build_server_url()
+        host = self.current_server_host()
+        self.server_url = self.build_server_url_from_host(host)
+        self.settings.setValue("server_host", host)
         self.refresh_data()
 
+    def current_server_host(self):
+        host = self.server_input.text().strip()
+        if not host:
+            host = "localhost"
+        return host
+
     def build_server_url(self):
-        ip = self.server_input.text().strip()
-        if not ip:
-            ip = "localhost"
-        return f"http://{ip}:5000/api"
+        return self.build_server_url_from_host(self.current_server_host())
+
+    def build_server_url_from_host(self, host):
+        return f"http://{host}:5000/api"
 
     def response_message(self, response, fallback):
         try:

@@ -178,7 +178,7 @@ class PiDisplay(QMainWindow):
         self.main_layout.addLayout(content_layout)
 
     def update_clock(self):
-        self.clock_label.setText(QDateTime.currentDateTime().toString("hh:mm:ss | ddd, MMM d"))
+        self.clock_label.setText(QDateTime.currentDateTime().toString("h:mm:ss AP | ddd, MMM d"))
 
     def clear_layout(self, layout):
         while layout.count():
