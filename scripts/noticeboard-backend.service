@@ -11,6 +11,8 @@ User=__NOTICEBOARD_USER__
 WorkingDirectory=__NOTICEBOARD_APP_DIR__/backend
 Environment=NOTICEBOARD_HOST=0.0.0.0
 Environment=NOTICEBOARD_PORT=5000
+Environment=NOTICEBOARD_SYSTEMCTL=/usr/bin/systemctl
+Environment=NOTICEBOARD_DISPLAY_SERVICE=noticeboard-display.service
 ExecStart=/usr/bin/python3 __NOTICEBOARD_APP_DIR__/backend/app.py
 Restart=always
 RestartSec=5

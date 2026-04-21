@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from datetime import datetime
 import os
+import subprocess
 
 app = Flask(__name__)
 CORS(app)
@@ -12,6 +13,30 @@ db_path = os.path.join(os.path.dirname(__file__), 'noticeboard.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+
+
+def restart_display_service():
+    service_name = os.environ.get('NOTICEBOARD_DISPLAY_SERVICE', 'noticeboard-display.service')
+    systemctl_bin = os.environ.get('NOTICEBOARD_SYSTEMCTL', '/usr/bin/systemctl')
+    restart_command = ['sudo', '-n', systemctl_bin, 'restart', service_name]
+
+    try:
+        subprocess.run(
+            restart_command,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except FileNotFoundError as exc:
+        return jsonify({'error': f'Could not run restart command: {exc}'}), 500
+    except subprocess.TimeoutExpired:
+        return jsonify({'error': 'Timed out while restarting the display service.'}), 500
+    except subprocess.CalledProcessError as exc:
+        error_message = (exc.stderr or exc.stdout or str(exc)).strip()
+        return jsonify({'error': f'Could not restart the display service: {error_message}'}), 500
+
+    return jsonify({'message': 'display restart requested'}), 202
 
 # Models
 class Notice(db.Model):
@@ -97,6 +122,11 @@ def delete_task(id):
     db.session.delete(task)
     db.session.commit()
     return '', 204
+
+
+@app.route('/api/admin/restart-display', methods=['POST'])
+def restart_display():
+    return restart_display_service()
 
 if __name__ == '__main__':
     with app.app_context():

@@ -80,7 +80,12 @@ main() {
     log "Update complete."
 }
 
-exec 9>"$LOCK_FILE"
+if [[ ! -e "$LOCK_FILE" ]]; then
+    : > "$LOCK_FILE"
+    chmod 644 "$LOCK_FILE" || true
+fi
+
+exec 9<"$LOCK_FILE"
 if ! flock -n 9; then
     if [[ "$SCHEDULED_MODE" -eq 0 ]]; then
         log "Another update process is already running."

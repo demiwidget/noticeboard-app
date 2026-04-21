@@ -19,9 +19,14 @@ APP_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 BACKEND_DIR="$APP_DIR/backend"
 DISPLAY_DIR="$APP_DIR/pi_display"
 PYTHON_BIN="/usr/bin/python3"
+SYSTEMCTL_BIN="$(command -v systemctl)"
 
 if [[ ! -f "$BACKEND_DIR/app.py" || ! -f "$DISPLAY_DIR/main.py" ]]; then
     fail "Cannot find backend/app.py and pi_display/main.py. Run this from the repository's scripts directory."
+fi
+
+if [[ -z "$SYSTEMCTL_BIN" ]]; then
+    fail "Could not find systemctl on this Raspberry Pi."
 fi
 
 chmod +x "$SCRIPT_DIR/update_pi.sh"
@@ -95,6 +100,16 @@ NOTICEBOARD_APP_DIR=$APP_DIR
 NOTICEBOARD_APP_USER=$APP_USER
 ENVFILE
 
+log "Writing restart permission for the backend..."
+"${SUDO[@]}" tee /etc/sudoers.d/noticeboard-display-restart >/dev/null <<SUDOERS
+# Allow the noticeboard backend to restart only the Pi display service.
+$APP_USER ALL=(root) NOPASSWD: $SYSTEMCTL_BIN restart noticeboard-display.service
+SUDOERS
+"${SUDO[@]}" chmod 440 /etc/sudoers.d/noticeboard-display-restart
+if command -v visudo >/dev/null 2>&1; then
+    "${SUDO[@]}" visudo -cf /etc/sudoers >/dev/null
+fi
+
 log "Writing systemd services with the detected user and project path..."
 "${SUDO[@]}" tee /etc/systemd/system/noticeboard-backend.service >/dev/null <<SERVICE
 [Unit]
@@ -108,6 +123,8 @@ User=$APP_USER
 WorkingDirectory=$BACKEND_DIR
 Environment=NOTICEBOARD_HOST=0.0.0.0
 Environment=NOTICEBOARD_PORT=5000
+Environment=NOTICEBOARD_SYSTEMCTL=$SYSTEMCTL_BIN
+Environment=NOTICEBOARD_DISPLAY_SERVICE=noticeboard-display.service
 ExecStart=$PYTHON_BIN "$BACKEND_DIR/app.py"
 Restart=always
 RestartSec=5

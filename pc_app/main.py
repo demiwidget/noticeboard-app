@@ -84,11 +84,16 @@ class NoticeBoardAdmin(QMainWindow):
             }
             QTabBar::tab {
                 background: #f1f2f6;
+                color: #52606d;
                 padding: 12px 30px;
                 margin-right: 5px;
                 border-top-left-radius: 10px;
                 border-top-right-radius: 10px;
                 font-weight: bold;
+            }
+            QTabBar::tab:hover {
+                background: #e7ecf3;
+                color: #2f3640;
             }
             QTabBar::tab:selected {
                 background: white;
@@ -110,6 +115,7 @@ class NoticeBoardAdmin(QMainWindow):
         title_label.setFont(QFont("Arial", 24, QFont.Weight.Bold))
         title_label.setStyleSheet("color: #2c3e50;")
         header.addWidget(title_label)
+        header.addStretch()
         
         self.server_input = QLineEdit()
         self.server_input.setPlaceholderText("Server IP (e.g., 192.168.1.100)")
@@ -120,6 +126,10 @@ class NoticeBoardAdmin(QMainWindow):
         connect_btn = ModernButton("Connect", "#2ecc71", "fa5s.link")
         connect_btn.clicked.connect(self.update_server_url)
         header.addWidget(connect_btn)
+
+        self.restart_display_btn = ModernButton("Restart Pi Display", "#e67e22", "fa5s.redo-alt")
+        self.restart_display_btn.clicked.connect(self.restart_pi_display)
+        header.addWidget(self.restart_display_btn)
         
         layout.addLayout(header)
 
@@ -235,11 +245,54 @@ class NoticeBoardAdmin(QMainWindow):
         layout.addLayout(list_container)
 
     def update_server_url(self):
+        self.server_url = self.build_server_url()
+        self.refresh_data()
+
+    def build_server_url(self):
         ip = self.server_input.text().strip()
         if not ip:
             ip = "localhost"
-        self.server_url = f"http://{ip}:5000/api"
-        self.refresh_data()
+        return f"http://{ip}:5000/api"
+
+    def response_message(self, response, fallback):
+        try:
+            payload = response.json()
+        except ValueError:
+            return fallback
+
+        if isinstance(payload, dict):
+            return payload.get("message") or payload.get("error") or fallback
+
+        return fallback
+
+    def restart_pi_display(self):
+        self.server_url = self.build_server_url()
+        reply = QMessageBox.question(
+            self,
+            "Restart Pi Display",
+            "Restart the Raspberry Pi display app now?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        self.restart_display_btn.setEnabled(False)
+        try:
+            response = requests.post(f"{self.server_url}/admin/restart-display", timeout=5)
+            if response.status_code == 202:
+                message = self.response_message(response, "Pi display restart requested.")
+                QMessageBox.information(self, "Restart Requested", message)
+            else:
+                message = self.response_message(
+                    response,
+                    f"Could not restart the Pi display (HTTP {response.status_code}).",
+                )
+                QMessageBox.critical(self, "Restart Failed", message)
+        except requests.RequestException as e:
+            QMessageBox.critical(self, "Restart Failed", f"Could not reach the Pi backend: {e}")
+        finally:
+            self.restart_display_btn.setEnabled(True)
 
     def refresh_data(self):
         try:
