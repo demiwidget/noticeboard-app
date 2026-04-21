@@ -118,18 +118,22 @@ This section details how to set up and run the PC application to manage your not
     ```
 2.  **Navigate to the PC App Directory**:
     ```bash
-    cd noticeboard-app/pc_app
+    cd noticeboard-app
     ```
-3.  **Install Python Dependencies**:
+3.  **Windows quick start**: Double-click `Noticeboard Manager.cmd` in the project folder. On first run it creates a virtual environment and installs the PC dependencies automatically.
+
+Manual fallback:
     ```bash
-    python3 -m pip install PyQt6 requests qtawesome
+    py -m venv .venv
+    .\.venv\Scripts\Activate.ps1
+    python -m pip install PyQt6 requests qtawesome
     ```
 
 ### Running the Application
 
 1.  **Execute the PC Application**:
     ```bash
-    python main.py
+    python pc_app\main.py
     ```
     The Noticeboard Manager GUI should now appear.
 

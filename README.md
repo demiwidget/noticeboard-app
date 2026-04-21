@@ -36,9 +36,17 @@ sudo journalctl -u noticeboard-backend -u noticeboard-display -f
 
 ### 2. PC Management Setup
 1. Ensure you have Python installed.
-2. Install dependencies: `python3 -m pip install PyQt6 requests qtawesome`.
-3. Run the app: `python pc_app/main.py`.
-4. Enter the IP address of your Raspberry Pi in the top bar and click "Connect".
+2. On Windows, double-click `Noticeboard Manager.cmd` from the project folder. It creates the virtual environment and installs dependencies automatically on first run.
+3. Enter the IP address of your Raspberry Pi in the top bar and click "Connect".
+
+Manual fallback:
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install PyQt6 requests qtawesome
+python pc_app\main.py
+```
 
 ## Usage
 - **Adding Notices**: Use the "Manage Notices" tab in the PC app.

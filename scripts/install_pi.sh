@@ -90,7 +90,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=$APP_USER
-WorkingDirectory="$BACKEND_DIR"
+WorkingDirectory=$BACKEND_DIR
 Environment=NOTICEBOARD_HOST=0.0.0.0
 Environment=NOTICEBOARD_PORT=5000
 ExecStart=$PYTHON_BIN "$BACKEND_DIR/app.py"
@@ -110,7 +110,7 @@ Wants=noticeboard-backend.service
 [Service]
 Type=simple
 User=$APP_USER
-WorkingDirectory="$DISPLAY_DIR"
+WorkingDirectory=$DISPLAY_DIR
 Environment=DISPLAY=:0
 Environment=XAUTHORITY=$APP_HOME/.Xauthority
 Environment=XDG_RUNTIME_DIR=/run/user/$APP_UID

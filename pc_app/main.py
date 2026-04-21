@@ -12,7 +12,11 @@ class ModernButton(QPushButton):
     def __init__(self, text, color="#3498db", icon=None):
         super().__init__(text)
         if icon:
-            self.setIcon(qta.icon(icon, color='white'))
+            try:
+                self.setIcon(qta.icon(icon, color='white'))
+            except Exception:
+                # Keep the app usable if a qtawesome icon name changes.
+                pass
         self.setStyleSheet(f"""
             QPushButton {{
                 background-color: {color};
@@ -51,9 +55,27 @@ class NoticeBoardAdmin(QMainWindow):
                 border-radius: 6px;
                 padding: 8px;
                 background-color: white;
+                color: #1f2933;
+                selection-background-color: #3498db;
+                selection-color: white;
+                font-size: 14px;
+                placeholder-text-color: #7f8c8d;
             }
             QLineEdit:focus, QTextEdit:focus {
                 border: 2px solid #3498db;
+            }
+            QComboBox QAbstractItemView {
+                background-color: white;
+                color: #1f2933;
+                selection-background-color: #3498db;
+                selection-color: white;
+            }
+            QListWidget {
+                background-color: white;
+                color: #1f2933;
+                border: 2px solid #dcdde1;
+                border-radius: 6px;
+                padding: 6px;
             }
             QTabWidget::pane {
                 border: 1px solid #dcdde1;
@@ -95,7 +117,7 @@ class NoticeBoardAdmin(QMainWindow):
         self.server_input.setText("localhost")
         header.addWidget(self.server_input)
         
-        connect_btn = ModernButton("Connect", "#2ecc71", "fa5.link")
+        connect_btn = ModernButton("Connect", "#2ecc71", "fa5s.link")
         connect_btn.clicked.connect(self.update_server_url)
         header.addWidget(connect_btn)
         
@@ -116,7 +138,7 @@ class NoticeBoardAdmin(QMainWindow):
         self.tabs.addTab(self.task_tab, "Assign Tasks")
 
         # Refresh button at bottom
-        refresh_btn = ModernButton("Refresh All Data", "#9b59b6", "fa5.sync")
+        refresh_btn = ModernButton("Refresh All Data", "#9b59b6", "fa5s.sync")
         refresh_btn.clicked.connect(self.refresh_data)
         layout.addWidget(refresh_btn, alignment=Qt.AlignmentFlag.AlignRight)
 
@@ -144,7 +166,7 @@ class NoticeBoardAdmin(QMainWindow):
         form_layout.addWidget(QLabel("Priority:"))
         form_layout.addWidget(self.notice_priority)
         
-        add_btn = ModernButton("Post Notice", "#3498db", "fa5.paper-plane")
+        add_btn = ModernButton("Post Notice", "#3498db", "fa5s.paper-plane")
         add_btn.clicked.connect(self.add_notice)
         form_layout.addWidget(add_btn)
         form_layout.addStretch()
@@ -158,7 +180,7 @@ class NoticeBoardAdmin(QMainWindow):
         self.notice_list.setSpacing(5)
         list_container.addWidget(self.notice_list)
         
-        del_btn = ModernButton("Remove Selected", "#e74c3c", "fa5.trash-alt")
+        del_btn = ModernButton("Remove Selected", "#e74c3c", "fa5s.trash-alt")
         del_btn.clicked.connect(self.delete_notice)
         list_container.addWidget(del_btn)
         
@@ -192,7 +214,7 @@ class NoticeBoardAdmin(QMainWindow):
         form_layout.addWidget(QLabel("Priority:"))
         form_layout.addWidget(self.task_priority)
         
-        add_btn = ModernButton("Assign Task", "#f39c12", "fa5.tasks")
+        add_btn = ModernButton("Assign Task", "#f39c12", "fa5s.tasks")
         add_btn.clicked.connect(self.add_task)
         form_layout.addWidget(add_btn)
         form_layout.addStretch()
@@ -206,7 +228,7 @@ class NoticeBoardAdmin(QMainWindow):
         self.task_list.setSpacing(5)
         list_container.addWidget(self.task_list)
         
-        del_btn = ModernButton("Remove Selected", "#e74c3c", "fa5.trash-alt")
+        del_btn = ModernButton("Remove Selected", "#e74c3c", "fa5s.trash-alt")
         del_btn.clicked.connect(self.delete_task)
         list_container.addWidget(del_btn)
         
