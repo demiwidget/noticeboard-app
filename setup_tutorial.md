@@ -120,7 +120,9 @@ This section details how to set up and run the PC application to manage your not
     ```bash
     cd noticeboard-app
     ```
-3.  **Windows quick start**: Double-click `Noticeboard Manager.cmd` in the project folder. On first run it creates a virtual environment and installs the PC dependencies automatically.
+3.  **Windows quick start**: Double-click `Noticeboard Manager.vbs` in the project folder. It launches without a console window, creates a virtual environment on first run, installs the PC dependencies automatically, and checks for Git updates before startup when the repo is a clean clone.
+
+    `Noticeboard Manager.cmd` remains available as a debug launcher if you ever want to see startup output.
 
 Manual fallback:
     ```bash
@@ -136,6 +138,15 @@ Manual fallback:
     python pc_app\main.py
     ```
     The Noticeboard Manager GUI should now appear.
+
+### Automatic Updates
+
+*   **PC app**: Launching via `Noticeboard Manager.vbs` checks the GitHub clone for updates before the app opens. If the local repo has tracked file changes, the update step is skipped to avoid overwriting local edits.
+*   **Raspberry Pi**: `install_pi.sh` now installs `noticeboard-update.timer`, which runs every 6 hours, checks for repo updates, pulls them, reruns the Pi installer in update mode, and restarts the backend and display services.
+*   **Manual Pi update**:
+    ```bash
+    ~/noticeboard-app/scripts/update_pi.sh
+    ```
 
 ### Connecting to the Raspberry Pi Backend
 

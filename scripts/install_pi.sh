@@ -24,7 +24,11 @@ if [[ ! -f "$BACKEND_DIR/app.py" || ! -f "$DISPLAY_DIR/main.py" ]]; then
     fail "Cannot find backend/app.py and pi_display/main.py. Run this from the repository's scripts directory."
 fi
 
-if [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != "root" ]]; then
+chmod +x "$SCRIPT_DIR/update_pi.sh"
+
+if [[ -n "${NOTICEBOARD_APP_USER:-}" ]]; then
+    APP_USER="$NOTICEBOARD_APP_USER"
+elif [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != "root" ]]; then
     APP_USER="$SUDO_USER"
 else
     APP_USER="$(id -un)"
@@ -46,10 +50,8 @@ fi
 log "Installing Noticeboard from: $APP_DIR"
 log "Services will run as user: $APP_USER"
 
-log "Updating package lists..."
-"${SUDO[@]}" apt-get update
-
 BASE_PACKAGES=(
+    git
     python3
     python3-flask
     python3-flask-sqlalchemy
@@ -77,8 +79,21 @@ else
     fail "Could not find python3-pyqt6 or python3-pyqt5 in apt. Use Raspberry Pi OS Bookworm/Bullseye with Desktop enabled."
 fi
 
-log "Installing Python and Qt packages from apt..."
-"${SUDO[@]}" apt-get install -y "${BASE_PACKAGES[@]}" "${QT_PACKAGES[@]}" "${OPTIONAL_QT_PACKAGES[@]}"
+if [[ "${NOTICEBOARD_SKIP_APT:-0}" != "1" ]]; then
+    log "Updating package lists..."
+    "${SUDO[@]}" apt-get update
+
+    log "Installing Python and Qt packages from apt..."
+    "${SUDO[@]}" apt-get install -y "${BASE_PACKAGES[@]}" "${QT_PACKAGES[@]}" "${OPTIONAL_QT_PACKAGES[@]}"
+else
+    log "Skipping apt package installation because NOTICEBOARD_SKIP_APT=1"
+fi
+
+log "Writing updater environment..."
+"${SUDO[@]}" tee /etc/default/noticeboard >/dev/null <<ENVFILE
+NOTICEBOARD_APP_DIR=$APP_DIR
+NOTICEBOARD_APP_USER=$APP_USER
+ENVFILE
 
 log "Writing systemd services with the detected user and project path..."
 "${SUDO[@]}" tee /etc/systemd/system/noticeboard-backend.service >/dev/null <<SERVICE
@@ -125,10 +140,40 @@ RestartSec=10
 WantedBy=graphical.target
 SERVICE
 
+"${SUDO[@]}" tee /etc/systemd/system/noticeboard-update.service >/dev/null <<SERVICE
+[Unit]
+Description=Noticeboard Auto Update
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/default/noticeboard
+WorkingDirectory=$APP_DIR
+ExecStart=/usr/bin/env bash $APP_DIR/scripts/update_pi.sh --scheduled
+SERVICE
+
+"${SUDO[@]}" tee /etc/systemd/system/noticeboard-update.timer >/dev/null <<SERVICE
+[Unit]
+Description=Run Noticeboard Auto Update Regularly
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=6h
+RandomizedDelaySec=15min
+Persistent=true
+Unit=noticeboard-update.service
+
+[Install]
+WantedBy=timers.target
+SERVICE
+
 log "Enabling and starting services..."
 "${SUDO[@]}" systemctl daemon-reload
 "${SUDO[@]}" systemctl enable noticeboard-backend.service
 "${SUDO[@]}" systemctl enable noticeboard-display.service
+"${SUDO[@]}" systemctl enable noticeboard-update.timer
+"${SUDO[@]}" systemctl start noticeboard-update.timer
 "${SUDO[@]}" systemctl restart noticeboard-backend.service
 
 if ! "${SUDO[@]}" systemctl restart noticeboard-display.service; then
@@ -139,3 +184,4 @@ fi
 log "Installation complete."
 log "Check the backend with: curl http://localhost:5000/api/notices"
 log "Check logs with: sudo journalctl -u noticeboard-backend -u noticeboard-display -f"
+log "Manual update: $APP_DIR/scripts/update_pi.sh"

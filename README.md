@@ -36,8 +36,9 @@ sudo journalctl -u noticeboard-backend -u noticeboard-display -f
 
 ### 2. PC Management Setup
 1. Ensure you have Python installed.
-2. On Windows, double-click `Noticeboard Manager.cmd` from the project folder. It creates the virtual environment and installs dependencies automatically on first run.
-3. Enter the IP address of your Raspberry Pi in the top bar and click "Connect".
+2. On Windows, double-click `Noticeboard Manager.vbs` from the project folder for a no-console app-style launch. It creates the virtual environment, installs dependencies on first run, and checks for Git updates automatically when the repo is a clean clone.
+3. `Noticeboard Manager.cmd` is kept as a visible debug launcher if you ever want to see startup output.
+4. Enter the IP address of your Raspberry Pi in the top bar and click "Connect".
 
 Manual fallback:
 
@@ -47,6 +48,10 @@ py -m venv .venv
 python -m pip install PyQt6 requests qtawesome
 python pc_app\main.py
 ```
+
+### 3. Auto Updates
+- **PC app**: When launched via `Noticeboard Manager.vbs`, the app checks Git for updates before starting. If the local repo has tracked file changes, the update is skipped to avoid overwriting them.
+- **Raspberry Pi**: Running `scripts/install_pi.sh` installs a `noticeboard-update.timer` systemd timer. It checks for repo updates every 6 hours, pulls them, reapplies the Pi install, and restarts the services.
 
 ## Usage
 - **Adding Notices**: Use the "Manage Notices" tab in the PC app.
