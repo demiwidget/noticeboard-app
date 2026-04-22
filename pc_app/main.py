@@ -109,7 +109,7 @@ class NoticeBoardAdmin(QMainWindow):
                 color: #2f3640;
                 font-size: 14px;
             }
-            QLineEdit, QTextEdit, QComboBox, QSpinBox {
+            QLineEdit, QTextEdit {
                 border: 2px solid #9fb5a6;
                 border-radius: 8px;
                 padding: 8px 10px;
@@ -119,40 +119,37 @@ class NoticeBoardAdmin(QMainWindow):
                 selection-color: white;
                 font-size: 14px;
             }
-            QLineEdit, QComboBox, QSpinBox {
+            QLineEdit {
                 min-height: 34px;
             }
             QTextEdit {
                 min-height: 110px;
                 padding: 10px 12px;
             }
-            QLineEdit:hover, QTextEdit:hover, QComboBox:hover, QSpinBox:hover {
+            QLineEdit:hover, QTextEdit:hover {
                 border-color: #6f9278;
                 background-color: white;
             }
-            QLineEdit:focus, QTextEdit:focus, QComboBox:focus, QSpinBox:focus {
+            QLineEdit:focus, QTextEdit:focus {
                 border: 2px solid #1f7a43;
                 background-color: white;
             }
             QLineEdit::placeholder, QTextEdit::placeholder {
                 color: #6b7f73;
             }
-            QComboBox {
-                padding-right: 10px;
-            }
-            QComboBox::drop-down {
-                width: 30px;
-                border-left: 1px solid #b7c8bb;
-                background-color: #eaf4ec;
-            }
-            QComboBox::drop-down:hover {
-                background-color: #dcefe0;
-            }
-            QComboBox QLineEdit {
-                background: transparent;
-                border: none;
+            QComboBox, QSpinBox {
+                min-height: 34px;
+                background-color: #ffffff;
                 color: #102a1c;
-                padding: 0;
+                border: 1px solid #9fb5a6;
+                border-radius: 6px;
+                font-size: 14px;
+            }
+            QComboBox:hover, QSpinBox:hover {
+                border: 1px solid #6f9278;
+            }
+            QComboBox:focus, QSpinBox:focus {
+                border: 2px solid #1f7a43;
             }
             QComboBox QAbstractItemView {
                 background-color: #ffffff;
