@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 import sys
+from html import escape as html_escape
 
 import requests
 
@@ -44,6 +45,8 @@ DEFAULT_PI_SETTINGS = {
     "pi_scroll_step": 2,
     "pi_scroll_pause_seconds": 2,
 }
+
+VOICE_START_DELAY_MS = 350
 
 if QT6:
     ALIGN_CENTER = Qt.AlignmentFlag.AlignCenter
@@ -633,9 +636,10 @@ class PiDisplay(QMainWindow):
     def speak_text(self, text):
         voice = str(self.pi_settings.get("pi_timer_voice") or DEFAULT_PI_SETTINGS["pi_timer_voice"]).strip()
         speech_rate = int(self.pi_settings.get("pi_timer_speech_rate") or DEFAULT_PI_SETTINGS["pi_timer_speech_rate"])
+        delayed_ssml = f"<speak><break time='{VOICE_START_DELAY_MS}ms'/>{html_escape(text)}</speak>"
         speech_commands = [
-            ["espeak-ng", "-v", voice, "-s", str(speech_rate), "-a", "170", text],
-            ["espeak", "-v", voice, "-s", str(speech_rate), "-a", "170", text],
+            ["espeak-ng", "-m", "-v", voice, "-s", str(speech_rate), "-a", "170", delayed_ssml],
+            ["espeak", "-m", "-v", voice, "-s", str(speech_rate), "-a", "170", delayed_ssml],
             ["spd-say", text],
         ]
 

@@ -120,7 +120,7 @@ class NoticeBoardAdmin(QMainWindow):
                 font-size: 14px;
             }
             QLineEdit, QComboBox, QSpinBox {
-                min-height: 22px;
+                min-height: 34px;
             }
             QTextEdit {
                 min-height: 110px;
@@ -138,49 +138,39 @@ class NoticeBoardAdmin(QMainWindow):
                 color: #6b7f73;
             }
             QComboBox {
-                padding-right: 38px;
+                padding-right: 10px;
             }
             QComboBox::drop-down {
-                subcontrol-origin: border;
-                subcontrol-position: top right;
                 width: 30px;
                 border-left: 1px solid #b7c8bb;
-                background-color: #eef6f0;
-                border-top-right-radius: 6px;
-                border-bottom-right-radius: 6px;
+                background-color: #eaf4ec;
             }
-            QComboBox::down-arrow, QSpinBox::up-arrow, QSpinBox::down-arrow {
-                width: 12px;
-                height: 12px;
-            }
-            QSpinBox {
-                padding-right: 40px;
-            }
-            QSpinBox::up-button {
-                subcontrol-origin: border;
-                subcontrol-position: top right;
-                width: 28px;
-                border-left: 1px solid #b7c8bb;
-                border-bottom: 1px solid #b7c8bb;
-                background-color: #eef6f0;
-                border-top-right-radius: 6px;
-            }
-            QSpinBox::down-button {
-                subcontrol-origin: border;
-                subcontrol-position: bottom right;
-                width: 28px;
-                border-left: 1px solid #b7c8bb;
-                background-color: #eef6f0;
-                border-bottom-right-radius: 6px;
-            }
-            QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+            QComboBox::drop-down:hover {
                 background-color: #dcefe0;
             }
+            QComboBox QLineEdit {
+                background: transparent;
+                border: none;
+                color: #102a1c;
+                padding: 0;
+            }
             QComboBox QAbstractItemView {
-                background-color: white;
+                background-color: #ffffff;
                 color: #102a1c;
                 selection-background-color: #1f7a43;
                 selection-color: white;
+                border: 1px solid #9fb5a6;
+                outline: 0;
+            }
+            QComboBox QAbstractItemView::item {
+                min-height: 28px;
+                padding: 6px 10px;
+                background-color: #ffffff;
+                color: #102a1c;
+            }
+            QComboBox QAbstractItemView::item:selected {
+                background-color: #1f7a43;
+                color: white;
             }
             QCheckBox {
                 color: #2f3640;

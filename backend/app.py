@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 from datetime import datetime, timedelta
+from html import escape as html_escape
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -15,6 +16,8 @@ db_path = os.path.join(os.path.dirname(__file__), "noticeboard.db")
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
+
+VOICE_START_DELAY_MS = 350
 
 SETTING_DEFINITIONS = {
     "pi_timer_sound_enabled": {"type": "bool", "default": True},
@@ -149,9 +152,10 @@ def request_display_refresh():
 
 
 def start_speech_preview(voice, speech_rate, text):
+    delayed_ssml = f"<speak><break time='{VOICE_START_DELAY_MS}ms'/>{html_escape(text)}</speak>"
     speech_commands = [
-        ["espeak-ng", "-v", voice, "-s", str(speech_rate), "-a", "170", text],
-        ["espeak", "-v", voice, "-s", str(speech_rate), "-a", "170", text],
+        ["espeak-ng", "-m", "-v", voice, "-s", str(speech_rate), "-a", "170", delayed_ssml],
+        ["espeak", "-m", "-v", voice, "-s", str(speech_rate), "-a", "170", delayed_ssml],
         ["spd-say", text],
     ]
     last_error = None
