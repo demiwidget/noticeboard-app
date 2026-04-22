@@ -621,6 +621,37 @@ class PiDisplay(QMainWindow):
         if not self.pi_settings["pi_timer_sound_enabled"]:
             return
 
+        return self.play_fallback_alert_sound()
+
+    def build_spoken_alert(self, task):
+        assignee = (task.get("assignee") or "Team").strip()
+        title = (task.get("title") or "this task").strip()
+        return f"{assignee}, your time for {title} has elapsed."
+
+    def speak_text(self, text):
+        speech_commands = [
+            ["espeak-ng", "-s", "165", "-a", "180", text],
+            ["espeak", "-s", "165", "-a", "180", text],
+            ["spd-say", text],
+        ]
+
+        for command in speech_commands:
+            command_path = shutil.which(command[0])
+            if not command_path:
+                continue
+            try:
+                subprocess.Popen(
+                    [command_path, *command[1:]],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                return True
+            except Exception:
+                continue
+
+        return False
+
+    def play_fallback_alert_sound(self):
         sound_options = [
             ("paplay", "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"),
             ("aplay", "/usr/share/sounds/alsa/Front_Center.wav"),
@@ -641,6 +672,17 @@ class PiDisplay(QMainWindow):
                 continue
 
         QApplication.beep()
+        return False
+
+    def announce_elapsed_task(self, task):
+        if not self.pi_settings["pi_timer_sound_enabled"]:
+            return
+
+        message = self.build_spoken_alert(task)
+        if self.speak_text(message):
+            return
+
+        self.play_fallback_alert_sound()
 
     def enqueue_popup(self, task):
         task_id = task["id"]
@@ -674,7 +716,7 @@ class PiDisplay(QMainWindow):
         self.position_popup()
         self.popup_frame.show()
         self.popup_frame.raise_()
-        self.play_timer_sound()
+        self.announce_elapsed_task(task)
         self.popup_hide_timer.start(int(self.pi_settings["pi_timer_popup_duration_seconds"]) * 1000)
 
     def hide_current_popup(self):
@@ -714,7 +756,8 @@ class PiDisplay(QMainWindow):
             return
 
         if self.pi_settings["pi_timer_sound_enabled"]:
-            self.play_timer_sound()
+            for task in new_elapsed_tasks:
+                self.announce_elapsed_task(task)
 
     def refresh_data(self):
         try:

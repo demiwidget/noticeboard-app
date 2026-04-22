@@ -63,6 +63,7 @@ BASE_PACKAGES=(
     python3-flask-sqlalchemy
     python3-flask-cors
     python3-requests
+    espeak-ng
 )
 
 QT_PLATFORM="xcb"

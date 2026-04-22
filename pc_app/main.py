@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QTabWidget,
     QTextEdit,
@@ -221,6 +222,18 @@ class NoticeBoardAdmin(QMainWindow):
 
         return frame, layout
 
+    def add_settings_field(self, layout, label_text, widget, help_text=None):
+        label = QLabel(label_text)
+        label.setStyleSheet("color: #2c3e50; font-weight: 700;")
+        layout.addWidget(label)
+        layout.addWidget(widget)
+
+        if help_text:
+            help_label = QLabel(help_text)
+            help_label.setWordWrap(True)
+            help_label.setStyleSheet("color: #6b7280; font-size: 13px;")
+            layout.addWidget(help_label)
+
     def setup_notice_tab(self):
         layout = QHBoxLayout(self.notice_tab)
 
@@ -353,8 +366,26 @@ class NoticeBoardAdmin(QMainWindow):
         )
 
     def setup_settings_tab(self):
-        layout = QVBoxLayout(self.settings_tab)
+        outer_layout = QVBoxLayout(self.settings_tab)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setStyleSheet("background: transparent; border: none;")
+        outer_layout.addWidget(scroll_area)
+
+        scroll_widget = QWidget()
+        scroll_area.setWidget(scroll_widget)
+
+        layout = QHBoxLayout(scroll_widget)
+        layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(16)
+
+        left_column = QVBoxLayout()
+        left_column.setSpacing(16)
+        right_column = QVBoxLayout()
+        right_column.setSpacing(16)
 
         connection_card, connection_layout = self.create_card(
             "Pi Connection",
@@ -363,8 +394,12 @@ class NoticeBoardAdmin(QMainWindow):
         self.server_host_input = QLineEdit()
         self.server_host_input.setPlaceholderText("Pi host or IP address")
         self.server_host_input.setText(self.saved_server_host)
-        connection_layout.addWidget(QLabel("Pi Host or IP:"))
-        connection_layout.addWidget(self.server_host_input)
+        self.add_settings_field(
+            connection_layout,
+            "Pi Host or IP",
+            self.server_host_input,
+            "Examples: 192.168.1.180 or dashboardmanager.local",
+        )
 
         connection_buttons = QHBoxLayout()
         connect_btn = ModernButton("Apply Connection", "#2ecc71", "fa5s.link")
@@ -379,56 +414,60 @@ class NoticeBoardAdmin(QMainWindow):
         self.connection_details_label = QLabel()
         self.connection_details_label.setWordWrap(True)
         connection_layout.addWidget(self.connection_details_label)
-        layout.addWidget(connection_card)
+        left_column.addWidget(connection_card)
 
         alerts_card, alerts_layout = self.create_card(
             "Pi Timer Alerts",
             "These settings are stored on the Pi backend and control sounds and timer popups on the display screen.",
         )
-        self.setting_pi_sound_enabled = QCheckBox("Play timer sound on the Pi display")
+        self.setting_pi_sound_enabled = QCheckBox("Speak timer alerts on the Pi display")
         alerts_layout.addWidget(self.setting_pi_sound_enabled)
 
         self.setting_pi_popup_enabled = QCheckBox("Show timer popup on the Pi display")
         alerts_layout.addWidget(self.setting_pi_popup_enabled)
 
-        popup_row = QHBoxLayout()
-        popup_row.addWidget(QLabel("Popup Duration (seconds):"))
         self.setting_popup_duration = QSpinBox()
         self.setting_popup_duration.setRange(5, 300)
-        popup_row.addWidget(self.setting_popup_duration)
-        popup_row.addStretch()
-        alerts_layout.addLayout(popup_row)
-        layout.addWidget(alerts_card)
+        self.add_settings_field(
+            alerts_layout,
+            "Popup Duration (seconds)",
+            self.setting_popup_duration,
+            "How long the elapsed-task popup stays on the Pi screen before it disappears.",
+        )
+        left_column.addWidget(alerts_card)
 
         display_card, display_layout = self.create_card(
             "Pi Display Behaviour",
             "These controls tune how often the Pi refreshes and how quickly long notice/task columns scroll.",
         )
 
-        refresh_row = QHBoxLayout()
-        refresh_row.addWidget(QLabel("Pi Refresh Interval (seconds):"))
         self.setting_refresh_interval = QSpinBox()
         self.setting_refresh_interval.setRange(1, 60)
-        refresh_row.addWidget(self.setting_refresh_interval)
-        refresh_row.addStretch()
-        display_layout.addLayout(refresh_row)
+        self.add_settings_field(
+            display_layout,
+            "Pi Refresh Interval (seconds)",
+            self.setting_refresh_interval,
+            "How often the Pi asks the backend for fresh notices, tasks, timers, and settings.",
+        )
 
-        scroll_speed_row = QHBoxLayout()
-        scroll_speed_row.addWidget(QLabel("Auto-Scroll Speed:"))
         self.setting_scroll_step = QSpinBox()
         self.setting_scroll_step.setRange(1, 10)
-        scroll_speed_row.addWidget(self.setting_scroll_step)
-        scroll_speed_row.addStretch()
-        display_layout.addLayout(scroll_speed_row)
+        self.add_settings_field(
+            display_layout,
+            "Auto-Scroll Speed",
+            self.setting_scroll_step,
+            "Higher values make long lists move faster on the Pi display.",
+        )
 
-        scroll_pause_row = QHBoxLayout()
-        scroll_pause_row.addWidget(QLabel("Auto-Scroll Pause (seconds):"))
         self.setting_scroll_pause = QSpinBox()
         self.setting_scroll_pause.setRange(1, 30)
-        scroll_pause_row.addWidget(self.setting_scroll_pause)
-        scroll_pause_row.addStretch()
-        display_layout.addLayout(scroll_pause_row)
-        layout.addWidget(display_card)
+        self.add_settings_field(
+            display_layout,
+            "Auto-Scroll Pause (seconds)",
+            self.setting_scroll_pause,
+            "How long the Pi pauses at the top and bottom of a scrolling column.",
+        )
+        right_column.addWidget(display_card)
 
         actions_card, actions_layout = self.create_card(
             "Save Settings",
@@ -447,9 +486,12 @@ class NoticeBoardAdmin(QMainWindow):
         self.pi_settings_status_label = QLabel("Pi settings have not been loaded yet.")
         self.pi_settings_status_label.setWordWrap(True)
         actions_layout.addWidget(self.pi_settings_status_label)
-        layout.addWidget(actions_card)
+        right_column.addWidget(actions_card)
 
-        layout.addStretch()
+        left_column.addStretch()
+        right_column.addStretch()
+        layout.addLayout(left_column, 1)
+        layout.addLayout(right_column, 1)
         self.populate_remote_settings_controls(DEFAULT_REMOTE_SETTINGS.copy())
         self.update_remote_settings_availability(False, "Connect to the Pi and load its settings to edit them.")
 
