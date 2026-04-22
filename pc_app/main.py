@@ -2,9 +2,10 @@ import sys
 
 import qtawesome as qta
 import requests
-from PyQt6.QtCore import QSize, QSettings, QTimer, Qt
+from PyQt6.QtCore import QEvent, QRect, QSize, QSettings, QTimer, Qt
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
+    QAbstractSpinBox,
     QApplication,
     QCheckBox,
     QComboBox,
@@ -78,6 +79,55 @@ class ModernButton(QPushButton):
         """)
 
 
+class ReliableSpinBox(QSpinBox):
+    BUTTON_WIDTH = 26
+    BUTTON_MARGIN = 2
+
+    def __init__(self):
+        super().__init__()
+        self.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.UpDownArrows)
+        self.setAccelerated(True)
+        self.lineEdit().installEventFilter(self)
+
+    def spin_button_rects(self):
+        button_width = min(max(self.BUTTON_WIDTH, self.height() // 2), max(self.BUTTON_WIDTH, self.width() // 3))
+        button_left = max(self.BUTTON_MARGIN, self.width() - button_width - self.BUTTON_MARGIN)
+        top = self.BUTTON_MARGIN
+        available_height = max(2, self.height() - (self.BUTTON_MARGIN * 2))
+        top_height = max(1, available_height // 2)
+        bottom_height = max(1, available_height - top_height)
+        up_rect = QRect(button_left, top, button_width, top_height)
+        down_rect = QRect(button_left, top + top_height, button_width, bottom_height)
+        return up_rect, down_rect
+
+    def handle_button_click(self, point):
+        if not self.isEnabled() or self.isReadOnly():
+            return False
+
+        up_rect, down_rect = self.spin_button_rects()
+        if up_rect.contains(point):
+            self.stepUp()
+            return True
+        if down_rect.contains(point):
+            self.stepDown()
+            return True
+        return False
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self.handle_button_click(event.position().toPoint()):
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def eventFilter(self, watched, event):
+        if watched is self.lineEdit() and event.type() == QEvent.Type.MouseButtonPress:
+            point = self.lineEdit().mapToParent(event.position().toPoint())
+            if self.handle_button_click(point):
+                event.accept()
+                return True
+        return super().eventFilter(watched, event)
+
+
 class NoticeBoardAdmin(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -144,6 +194,9 @@ class NoticeBoardAdmin(QMainWindow):
                 border: 1px solid #9fb5a6;
                 border-radius: 6px;
                 font-size: 14px;
+            }
+            QSpinBox {
+                padding-right: 28px;
             }
             QComboBox:hover, QSpinBox:hover {
                 border: 1px solid #6f9278;
@@ -369,12 +422,12 @@ class NoticeBoardAdmin(QMainWindow):
 
         timer_row = QHBoxLayout()
         timer_row.addWidget(QLabel("Hours:"))
-        self.task_timer_hours = QSpinBox()
+        self.task_timer_hours = ReliableSpinBox()
         self.task_timer_hours.setRange(0, 72)
         timer_row.addWidget(self.task_timer_hours)
 
         timer_row.addWidget(QLabel("Minutes:"))
-        self.task_timer_minutes = QSpinBox()
+        self.task_timer_minutes = ReliableSpinBox()
         self.task_timer_minutes.setRange(0, 59)
         timer_row.addWidget(self.task_timer_minutes)
         form_layout.addLayout(timer_row)
@@ -489,7 +542,7 @@ class NoticeBoardAdmin(QMainWindow):
             "Pick a voice preset or type a custom `espeak-ng` voice code if you want to experiment.",
         )
 
-        self.setting_speech_rate = QSpinBox()
+        self.setting_speech_rate = ReliableSpinBox()
         self.setting_speech_rate.setRange(80, 220)
         self.add_settings_field(
             alerts_layout,
@@ -513,7 +566,7 @@ class NoticeBoardAdmin(QMainWindow):
         self.setting_pi_popup_enabled = QCheckBox("Show timer popup on the Pi display")
         alerts_layout.addWidget(self.setting_pi_popup_enabled)
 
-        self.setting_popup_duration = QSpinBox()
+        self.setting_popup_duration = ReliableSpinBox()
         self.setting_popup_duration.setRange(5, 300)
         self.add_settings_field(
             alerts_layout,
@@ -528,7 +581,7 @@ class NoticeBoardAdmin(QMainWindow):
             "These controls tune how often the Pi refreshes and how quickly long notice/task columns scroll.",
         )
 
-        self.setting_refresh_interval = QSpinBox()
+        self.setting_refresh_interval = ReliableSpinBox()
         self.setting_refresh_interval.setRange(1, 60)
         self.add_settings_field(
             display_layout,
@@ -537,7 +590,7 @@ class NoticeBoardAdmin(QMainWindow):
             "How often the Pi asks the backend for fresh notices, tasks, timers, and settings.",
         )
 
-        self.setting_scroll_step = QSpinBox()
+        self.setting_scroll_step = ReliableSpinBox()
         self.setting_scroll_step.setRange(1, 10)
         self.add_settings_field(
             display_layout,
@@ -546,7 +599,7 @@ class NoticeBoardAdmin(QMainWindow):
             "Higher values make long lists move faster on the Pi display.",
         )
 
-        self.setting_scroll_pause = QSpinBox()
+        self.setting_scroll_pause = ReliableSpinBox()
         self.setting_scroll_pause.setRange(1, 30)
         self.add_settings_field(
             display_layout,
