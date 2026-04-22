@@ -37,6 +37,8 @@ except ImportError:
 DEFAULT_PI_SETTINGS = {
     "pi_timer_sound_enabled": True,
     "pi_timer_popup_enabled": True,
+    "pi_timer_voice": "en-gb",
+    "pi_timer_speech_rate": 120,
     "pi_timer_popup_duration_seconds": 30,
     "pi_refresh_interval_seconds": 2,
     "pi_scroll_step": 2,
@@ -629,9 +631,11 @@ class PiDisplay(QMainWindow):
         return f"{assignee}, your time for {title} has elapsed."
 
     def speak_text(self, text):
+        voice = str(self.pi_settings.get("pi_timer_voice") or DEFAULT_PI_SETTINGS["pi_timer_voice"]).strip()
+        speech_rate = int(self.pi_settings.get("pi_timer_speech_rate") or DEFAULT_PI_SETTINGS["pi_timer_speech_rate"])
         speech_commands = [
-            ["espeak-ng", "-s", "165", "-a", "180", text],
-            ["espeak", "-s", "165", "-a", "180", text],
+            ["espeak-ng", "-v", voice, "-s", str(speech_rate), "-a", "170", text],
+            ["espeak", "-v", voice, "-s", str(speech_rate), "-a", "170", text],
             ["spd-say", text],
         ]
 

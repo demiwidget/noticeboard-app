@@ -18,6 +18,8 @@ db = SQLAlchemy(app)
 SETTING_DEFINITIONS = {
     "pi_timer_sound_enabled": {"type": "bool", "default": True},
     "pi_timer_popup_enabled": {"type": "bool", "default": True},
+    "pi_timer_voice": {"type": "str", "default": "en-gb"},
+    "pi_timer_speech_rate": {"type": "int", "default": 120, "min": 80, "max": 220},
     "pi_timer_popup_duration_seconds": {"type": "int", "default": 30, "min": 5, "max": 300},
     "pi_refresh_interval_seconds": {"type": "int", "default": 2, "min": 1, "max": 60},
     "pi_scroll_step": {"type": "int", "default": 2, "min": 1, "max": 10},
@@ -59,8 +61,11 @@ def normalize_countdown_seconds(value):
 
 
 def serialize_setting_value(key, value):
-    if SETTING_DEFINITIONS[key]["type"] == "bool":
+    setting_type = SETTING_DEFINITIONS[key]["type"]
+    if setting_type == "bool":
         return "1" if value else "0"
+    if setting_type == "str":
+        return normalize_text(value)
     return str(int(value))
 
 
@@ -68,8 +73,12 @@ def deserialize_setting_value(key, raw_value):
     if raw_value is None:
         return SETTING_DEFINITIONS[key]["default"]
 
-    if SETTING_DEFINITIONS[key]["type"] == "bool":
+    setting_type = SETTING_DEFINITIONS[key]["type"]
+    if setting_type == "bool":
         return str(raw_value).strip().lower() in {"1", "true", "yes", "on"}
+    if setting_type == "str":
+        text_value = normalize_text(raw_value)
+        return text_value or SETTING_DEFINITIONS[key]["default"]
 
     try:
         return int(raw_value)
@@ -89,6 +98,12 @@ def coerce_setting_value(key, value):
         if text_value in {"0", "false", "no", "off"}:
             return False
         raise ValueError(f"{key} must be true or false.")
+
+    if definition["type"] == "str":
+        text_value = normalize_text(value)
+        if not text_value:
+            raise ValueError(f"{key} cannot be blank.")
+        return text_value
 
     try:
         coerced_value = int(value)

@@ -28,11 +28,22 @@ from PyQt6.QtWidgets import (
 DEFAULT_REMOTE_SETTINGS = {
     "pi_timer_sound_enabled": True,
     "pi_timer_popup_enabled": True,
+    "pi_timer_voice": "en-gb",
+    "pi_timer_speech_rate": 120,
     "pi_timer_popup_duration_seconds": 30,
     "pi_refresh_interval_seconds": 2,
     "pi_scroll_step": 2,
     "pi_scroll_pause_seconds": 2,
 }
+
+VOICE_PRESETS = [
+    ("British English", "en-gb"),
+    ("British English Female", "en-gb+f3"),
+    ("British English Male", "en-gb+m3"),
+    ("English Default", "en"),
+    ("American English", "en-us"),
+    ("Scottish English", "en-sc"),
+]
 
 
 class ModernButton(QPushButton):
@@ -423,6 +434,27 @@ class NoticeBoardAdmin(QMainWindow):
         self.setting_pi_sound_enabled = QCheckBox("Speak timer alerts on the Pi display")
         alerts_layout.addWidget(self.setting_pi_sound_enabled)
 
+        self.setting_voice = QComboBox()
+        self.setting_voice.setEditable(True)
+        self.setting_voice.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        for label, voice_code in VOICE_PRESETS:
+            self.setting_voice.addItem(f"{label} ({voice_code})", voice_code)
+        self.add_settings_field(
+            alerts_layout,
+            "Speech Voice",
+            self.setting_voice,
+            "Pick a voice preset or type a custom `espeak-ng` voice code if you want to experiment.",
+        )
+
+        self.setting_speech_rate = QSpinBox()
+        self.setting_speech_rate.setRange(80, 220)
+        self.add_settings_field(
+            alerts_layout,
+            "Speech Speed",
+            self.setting_speech_rate,
+            "Lower values sound slower and usually a bit easier to understand from across the room.",
+        )
+
         self.setting_pi_popup_enabled = QCheckBox("Show timer popup on the Pi display")
         alerts_layout.addWidget(self.setting_pi_popup_enabled)
 
@@ -543,15 +575,45 @@ class NoticeBoardAdmin(QMainWindow):
         self.remote_settings = merged
 
         self.setting_pi_sound_enabled.setChecked(bool(merged["pi_timer_sound_enabled"]))
+        self.set_voice_combo_value(str(merged["pi_timer_voice"]))
+        self.setting_speech_rate.setValue(int(merged["pi_timer_speech_rate"]))
         self.setting_pi_popup_enabled.setChecked(bool(merged["pi_timer_popup_enabled"]))
         self.setting_popup_duration.setValue(int(merged["pi_timer_popup_duration_seconds"]))
         self.setting_refresh_interval.setValue(int(merged["pi_refresh_interval_seconds"]))
         self.setting_scroll_step.setValue(int(merged["pi_scroll_step"]))
         self.setting_scroll_pause.setValue(int(merged["pi_scroll_pause_seconds"]))
 
+    def set_voice_combo_value(self, voice_value):
+        voice_text = (voice_value or "").strip() or DEFAULT_REMOTE_SETTINGS["pi_timer_voice"]
+
+        self.setting_voice.blockSignals(True)
+        for index in range(self.setting_voice.count()):
+            if self.setting_voice.itemData(index) == voice_text:
+                self.setting_voice.setCurrentIndex(index)
+                self.setting_voice.blockSignals(False)
+                return
+
+        self.setting_voice.setCurrentIndex(-1)
+        self.setting_voice.setEditText(voice_text)
+        self.setting_voice.blockSignals(False)
+
+    def current_voice_value(self):
+        index = self.setting_voice.currentIndex()
+        if index >= 0:
+            data_value = self.setting_voice.itemData(index)
+            item_text = self.setting_voice.itemText(index)
+            current_text = self.setting_voice.currentText().strip()
+            if current_text == item_text and data_value:
+                return str(data_value)
+
+        current_text = self.setting_voice.currentText().strip()
+        return current_text or DEFAULT_REMOTE_SETTINGS["pi_timer_voice"]
+
     def collect_remote_settings_payload(self):
         return {
             "pi_timer_sound_enabled": self.setting_pi_sound_enabled.isChecked(),
+            "pi_timer_voice": self.current_voice_value(),
+            "pi_timer_speech_rate": self.setting_speech_rate.value(),
             "pi_timer_popup_enabled": self.setting_pi_popup_enabled.isChecked(),
             "pi_timer_popup_duration_seconds": self.setting_popup_duration.value(),
             "pi_refresh_interval_seconds": self.setting_refresh_interval.value(),
@@ -564,6 +626,8 @@ class NoticeBoardAdmin(QMainWindow):
         self.save_pi_settings_btn.setEnabled(available)
         self.reload_pi_settings_btn.setEnabled(True)
         self.setting_pi_sound_enabled.setEnabled(available)
+        self.setting_voice.setEnabled(available)
+        self.setting_speech_rate.setEnabled(available)
         self.setting_pi_popup_enabled.setEnabled(available)
         self.setting_popup_duration.setEnabled(available)
         self.setting_refresh_interval.setEnabled(available)
