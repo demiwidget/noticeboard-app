@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 from datetime import datetime, timedelta
 
@@ -145,6 +146,34 @@ def request_display_refresh():
         jsonify({"message": "Pi display refresh requested. The Pi will pull updates if any are available."}),
         202,
     )
+
+
+def start_speech_preview(voice, speech_rate, text):
+    speech_commands = [
+        ["espeak-ng", "-v", voice, "-s", str(speech_rate), "-a", "170", text],
+        ["espeak", "-v", voice, "-s", str(speech_rate), "-a", "170", text],
+        ["spd-say", text],
+    ]
+    last_error = None
+
+    for command in speech_commands:
+        command_path = shutil.which(command[0])
+        if not command_path:
+            continue
+        try:
+            subprocess.Popen(
+                [command_path, *command[1:]],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return None, os.path.basename(command_path)
+        except OSError as exc:
+            last_error = exc
+
+    if last_error:
+        return f"Could not start voice preview: {last_error}", None
+
+    return "No supported speech engine is installed on the Pi.", None
 
 
 class Notice(db.Model):
@@ -435,6 +464,33 @@ def delete_task(id):
 @app.route("/api/admin/restart-display", methods=["POST"])
 def restart_display():
     return request_display_refresh()
+
+
+@app.route("/api/admin/test-voice", methods=["POST"])
+def test_voice():
+    data = request.json or {}
+    current_settings = get_settings_payload()
+
+    try:
+        voice = coerce_setting_value("pi_timer_voice", data.get("voice", current_settings["pi_timer_voice"]))
+        speech_rate = coerce_setting_value(
+            "pi_timer_speech_rate",
+            data.get("speech_rate", current_settings["pi_timer_speech_rate"]),
+        )
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+    preview_text = normalize_text(data.get("text")) or "Hello team. This is a Noticeboard voice test."
+    error_message, engine_name = start_speech_preview(voice, speech_rate, preview_text)
+    if error_message:
+        return jsonify({"error": error_message}), 500
+
+    if engine_name in {"espeak-ng", "espeak"}:
+        message = f"Voice test started on the Pi using {engine_name}."
+    else:
+        message = "Voice test started on the Pi."
+
+    return jsonify({"message": message}), 202
 
 
 if __name__ == "__main__":

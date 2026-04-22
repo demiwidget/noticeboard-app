@@ -36,6 +36,8 @@ DEFAULT_REMOTE_SETTINGS = {
     "pi_scroll_pause_seconds": 2,
 }
 
+VOICE_TEST_SAMPLE = "Hello team. This is a Noticeboard voice test."
+
 VOICE_PRESETS = [
     ("British English", "en-gb"),
     ("British English Female", "en-gb+f3"),
@@ -108,22 +110,76 @@ class NoticeBoardAdmin(QMainWindow):
                 font-size: 14px;
             }
             QLineEdit, QTextEdit, QComboBox, QSpinBox {
-                border: 2px solid #dcdde1;
-                border-radius: 6px;
-                padding: 8px;
-                background-color: white;
-                color: #1f2933;
-                selection-background-color: #3498db;
+                border: 2px solid #9fb5a6;
+                border-radius: 8px;
+                padding: 8px 10px;
+                background-color: #fcfffd;
+                color: #102a1c;
+                selection-background-color: #1f7a43;
                 selection-color: white;
                 font-size: 14px;
             }
+            QLineEdit, QComboBox, QSpinBox {
+                min-height: 22px;
+            }
+            QTextEdit {
+                min-height: 110px;
+                padding: 10px 12px;
+            }
+            QLineEdit:hover, QTextEdit:hover, QComboBox:hover, QSpinBox:hover {
+                border-color: #6f9278;
+                background-color: white;
+            }
             QLineEdit:focus, QTextEdit:focus, QComboBox:focus, QSpinBox:focus {
-                border: 2px solid #3498db;
+                border: 2px solid #1f7a43;
+                background-color: white;
+            }
+            QLineEdit::placeholder, QTextEdit::placeholder {
+                color: #6b7f73;
+            }
+            QComboBox {
+                padding-right: 38px;
+            }
+            QComboBox::drop-down {
+                subcontrol-origin: border;
+                subcontrol-position: top right;
+                width: 30px;
+                border-left: 1px solid #b7c8bb;
+                background-color: #eef6f0;
+                border-top-right-radius: 6px;
+                border-bottom-right-radius: 6px;
+            }
+            QComboBox::down-arrow, QSpinBox::up-arrow, QSpinBox::down-arrow {
+                width: 12px;
+                height: 12px;
+            }
+            QSpinBox {
+                padding-right: 40px;
+            }
+            QSpinBox::up-button {
+                subcontrol-origin: border;
+                subcontrol-position: top right;
+                width: 28px;
+                border-left: 1px solid #b7c8bb;
+                border-bottom: 1px solid #b7c8bb;
+                background-color: #eef6f0;
+                border-top-right-radius: 6px;
+            }
+            QSpinBox::down-button {
+                subcontrol-origin: border;
+                subcontrol-position: bottom right;
+                width: 28px;
+                border-left: 1px solid #b7c8bb;
+                background-color: #eef6f0;
+                border-bottom-right-radius: 6px;
+            }
+            QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+                background-color: #dcefe0;
             }
             QComboBox QAbstractItemView {
                 background-color: white;
-                color: #1f2933;
-                selection-background-color: #3498db;
+                color: #102a1c;
+                selection-background-color: #1f7a43;
                 selection-color: white;
             }
             QCheckBox {
@@ -455,6 +511,18 @@ class NoticeBoardAdmin(QMainWindow):
             "Lower values sound slower and usually a bit easier to understand from across the room.",
         )
 
+        voice_actions = QHBoxLayout()
+        self.test_voice_btn = ModernButton("Test Pi Voice", "#1f7a43", "fa5s.volume-up")
+        self.test_voice_btn.clicked.connect(self.test_pi_voice)
+        voice_actions.addWidget(self.test_voice_btn)
+        voice_actions.addStretch()
+        alerts_layout.addLayout(voice_actions)
+
+        voice_help = QLabel("This plays a short sample on the Pi using the voice and speed shown above, even before you save.")
+        voice_help.setWordWrap(True)
+        voice_help.setStyleSheet("color: #6b7280; font-size: 13px;")
+        alerts_layout.addWidget(voice_help)
+
         self.setting_pi_popup_enabled = QCheckBox("Show timer popup on the Pi display")
         alerts_layout.addWidget(self.setting_pi_popup_enabled)
 
@@ -628,6 +696,7 @@ class NoticeBoardAdmin(QMainWindow):
         self.setting_pi_sound_enabled.setEnabled(available)
         self.setting_voice.setEnabled(available)
         self.setting_speech_rate.setEnabled(available)
+        self.test_voice_btn.setEnabled(available)
         self.setting_pi_popup_enabled.setEnabled(available)
         self.setting_popup_duration.setEnabled(available)
         self.setting_refresh_interval.setEnabled(available)
@@ -689,6 +758,47 @@ class NoticeBoardAdmin(QMainWindow):
 
         message = self.response_message(response, f"Could not save Pi settings (HTTP {response.status_code}).")
         QMessageBox.critical(self, "Pi Settings Error", message)
+
+    def test_pi_voice(self):
+        if not self.remote_settings_available:
+            QMessageBox.warning(
+                self,
+                "Voice Test Unavailable",
+                "Connect to the Pi and load its settings before testing the voice.",
+            )
+            return
+
+        self.sync_server_host()
+        payload = {
+            "voice": self.current_voice_value(),
+            "speech_rate": self.setting_speech_rate.value(),
+            "text": VOICE_TEST_SAMPLE,
+        }
+
+        self.test_voice_btn.setEnabled(False)
+        try:
+            response = requests.post(self.endpoint_url("admin/test-voice"), json=payload, timeout=5)
+        except requests.RequestException as error:
+            QMessageBox.critical(self, "Voice Test Failed", f"Could not reach the Pi backend: {error}")
+            return
+        finally:
+            self.test_voice_btn.setEnabled(self.remote_settings_available)
+
+        if response.status_code == 202:
+            message = self.response_message(response, "Voice test started on the Pi.")
+            QMessageBox.information(self, "Voice Test Started", message)
+            return
+
+        if response.status_code == 404:
+            QMessageBox.warning(
+                self,
+                "Voice Test Unavailable",
+                "The connected Pi backend does not support voice testing yet. Pull the latest update on the Pi.",
+            )
+            return
+
+        message = self.response_message(response, f"Could not start the Pi voice test (HTTP {response.status_code}).")
+        QMessageBox.critical(self, "Voice Test Failed", message)
 
     def current_assignee_name(self):
         return self.task_assignee.currentText().strip()
