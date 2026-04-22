@@ -109,9 +109,9 @@ main() {
     run_git pull --ff-only
 
     if [[ "$(id -u)" -eq 0 ]]; then
-        NOTICEBOARD_APP_USER="$APP_USER" NOTICEBOARD_SKIP_APT=1 "$APP_DIR/scripts/install_pi.sh"
+        NOTICEBOARD_APP_USER="$APP_USER" "$APP_DIR/scripts/install_pi.sh"
     else
-        NOTICEBOARD_APP_USER="$APP_USER" NOTICEBOARD_SKIP_APT=1 sudo "$APP_DIR/scripts/install_pi.sh"
+        NOTICEBOARD_APP_USER="$APP_USER" sudo "$APP_DIR/scripts/install_pi.sh"
     fi
 
     log "Update complete."
