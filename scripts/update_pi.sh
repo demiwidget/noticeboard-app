@@ -41,6 +41,18 @@ run_git() {
     fi
 }
 
+run_installer() {
+    if [[ "$(id -u)" -eq 0 ]]; then
+        NOTICEBOARD_APP_USER="$APP_USER" "$APP_DIR/scripts/install_pi.sh"
+    else
+        NOTICEBOARD_APP_USER="$APP_USER" sudo "$APP_DIR/scripts/install_pi.sh"
+    fi
+}
+
+runtime_packages_missing() {
+    ! command -v espeak-ng >/dev/null 2>&1
+}
+
 restart_display_service() {
     if [[ -z "$SYSTEMCTL_BIN" ]]; then
         log "Could not find systemctl; skipping display restart."
@@ -56,7 +68,17 @@ restart_display_service() {
 }
 
 finish_without_update() {
+    local installer_ran=0
+    if runtime_packages_missing; then
+        log "Detected missing runtime packages; running the installer to restore them."
+        run_installer
+        installer_ran=1
+    fi
+
     if [[ "$RESTART_DISPLAY_MODE" -eq 1 ]]; then
+        if [[ "$installer_ran" -eq 1 ]]; then
+            return 0
+        fi
         restart_display_service
     fi
     return 0
@@ -108,11 +130,7 @@ main() {
     log "Applying $behind_count update(s) from GitHub..."
     run_git pull --ff-only
 
-    if [[ "$(id -u)" -eq 0 ]]; then
-        NOTICEBOARD_APP_USER="$APP_USER" "$APP_DIR/scripts/install_pi.sh"
-    else
-        NOTICEBOARD_APP_USER="$APP_USER" sudo "$APP_DIR/scripts/install_pi.sh"
-    fi
+    run_installer
 
     log "Update complete."
 }
