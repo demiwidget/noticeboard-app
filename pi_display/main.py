@@ -1,4 +1,6 @@
 import os
+import shutil
+import subprocess
 import sys
 
 import requests
@@ -32,6 +34,15 @@ except ImportError:
     )
     QT6 = False
 
+DEFAULT_PI_SETTINGS = {
+    "pi_timer_sound_enabled": True,
+    "pi_timer_popup_enabled": True,
+    "pi_timer_popup_duration_seconds": 30,
+    "pi_refresh_interval_seconds": 2,
+    "pi_scroll_step": 2,
+    "pi_scroll_pause_seconds": 2,
+}
+
 if QT6:
     ALIGN_CENTER = Qt.AlignmentFlag.AlignCenter
     ALIGN_TOP = Qt.AlignmentFlag.AlignTop
@@ -39,6 +50,7 @@ if QT6:
     FONT_DEMIBOLD = QFont.Weight.DemiBold
     PALETTE_WINDOW = QPalette.ColorRole.Window
     STYLED_PANEL = QFrame.Shape.StyledPanel
+    WA_TRANSPARENT = Qt.WidgetAttribute.WA_TransparentForMouseEvents
 else:
     ALIGN_CENTER = Qt.AlignCenter
     ALIGN_TOP = Qt.AlignTop
@@ -46,6 +58,7 @@ else:
     FONT_DEMIBOLD = QFont.DemiBold
     PALETTE_WINDOW = QPalette.Window
     STYLED_PANEL = QFrame.StyledPanel
+    WA_TRANSPARENT = Qt.WA_TransparentForMouseEvents
 
 
 class Card(QFrame):
@@ -195,20 +208,28 @@ class PiDisplay(QMainWindow):
         self.showFullScreen()
         self.server_url = os.environ.get("NOTICEBOARD_API_URL", "http://127.0.0.1:5000/api")
         self.scroll_states = {}
+        self.pi_settings = DEFAULT_PI_SETTINGS.copy()
+        self.alerted_task_ids = set()
+        self.popup_queue = []
+        self.active_popup_task_id = None
 
         self.init_ui()
 
-        self.refresh_timer = QTimer()
+        self.refresh_timer = QTimer(self)
         self.refresh_timer.timeout.connect(self.refresh_data)
-        self.refresh_timer.start(10000)
+        self.refresh_timer.start(self.pi_settings["pi_refresh_interval_seconds"] * 1000)
 
-        self.clock_timer = QTimer()
+        self.clock_timer = QTimer(self)
         self.clock_timer.timeout.connect(self.update_clock)
         self.clock_timer.start(1000)
 
-        self.auto_scroll_timer = QTimer()
+        self.auto_scroll_timer = QTimer(self)
         self.auto_scroll_timer.timeout.connect(self.advance_auto_scroll)
         self.auto_scroll_timer.start(80)
+
+        self.popup_hide_timer = QTimer(self)
+        self.popup_hide_timer.setSingleShot(True)
+        self.popup_hide_timer.timeout.connect(self.hide_current_popup)
 
         self.refresh_data()
 
@@ -307,12 +328,54 @@ class PiDisplay(QMainWindow):
         self.main_layout.addLayout(content_layout)
 
         self.scroll_states = {
-            "notices": {"area": self.notices_area, "pause_ticks": 18, "at_bottom": False, "step": 2},
-            "tasks": {"area": self.tasks_area, "pause_ticks": 18, "at_bottom": False, "step": 2},
+            "notices": {"area": self.notices_area, "pause_ticks": self.pause_ticks_for(2), "at_bottom": False},
+            "tasks": {"area": self.tasks_area, "pause_ticks": self.pause_ticks_for(2), "at_bottom": False},
         }
 
+        self.build_popup_frame()
         self.set_connection_status("SYNCING", "#d7ac45")
         self.show_placeholder_cards()
+
+    def build_popup_frame(self):
+        self.popup_frame = QFrame(self.centralWidget())
+        self.popup_frame.setObjectName("timerPopup")
+        self.popup_frame.setAttribute(WA_TRANSPARENT, True)
+        self.popup_frame.setStyleSheet("""
+            QFrame#timerPopup {
+                background-color: rgba(28, 6, 6, 0.92);
+                border: 3px solid #f0625f;
+                border-radius: 24px;
+            }
+            QLabel {
+                background: transparent;
+                border: none;
+            }
+        """)
+        popup_layout = QVBoxLayout(self.popup_frame)
+        popup_layout.setContentsMargins(24, 22, 24, 22)
+        popup_layout.setSpacing(10)
+
+        popup_heading = QLabel("TIMER ELAPSED")
+        popup_heading.setFont(QFont("DejaVu Sans", 24, FONT_BOLD))
+        popup_heading.setStyleSheet("color: #ffd6d1;")
+        popup_layout.addWidget(popup_heading)
+
+        self.popup_title_label = QLabel("")
+        self.popup_title_label.setWordWrap(True)
+        self.popup_title_label.setFont(QFont("DejaVu Sans", 28, FONT_BOLD))
+        self.popup_title_label.setStyleSheet("color: white;")
+        popup_layout.addWidget(self.popup_title_label)
+
+        self.popup_assignee_label = QLabel("")
+        self.popup_assignee_label.setFont(QFont("DejaVu Sans", 16, FONT_DEMIBOLD))
+        self.popup_assignee_label.setStyleSheet("color: #ffe8e5;")
+        popup_layout.addWidget(self.popup_assignee_label)
+
+        self.popup_due_label = QLabel("")
+        self.popup_due_label.setFont(QFont("DejaVu Sans", 15, FONT_DEMIBOLD))
+        self.popup_due_label.setStyleSheet("color: #ffd7d3;")
+        popup_layout.addWidget(self.popup_due_label)
+        self.popup_frame.hide()
 
     def update_clock(self):
         self.clock_label.setText(QDateTime.currentDateTime().toString("h:mm:ss AP | ddd, MMM d"))
@@ -424,6 +487,42 @@ class PiDisplay(QMainWindow):
         self.render_notices([])
         self.render_tasks([])
 
+    def pause_ticks_for(self, seconds):
+        interval = max(1, self.auto_scroll_timer.interval() if hasattr(self, "auto_scroll_timer") else 80)
+        return max(1, int((seconds * 1000) / interval))
+
+    def apply_pi_settings(self, settings):
+        merged = DEFAULT_PI_SETTINGS.copy()
+        merged.update(settings or {})
+        self.pi_settings = merged
+
+        refresh_interval_ms = max(1000, int(self.pi_settings["pi_refresh_interval_seconds"]) * 1000)
+        if self.refresh_timer.interval() != refresh_interval_ms:
+            self.refresh_timer.setInterval(refresh_interval_ms)
+
+        if not self.pi_settings["pi_timer_popup_enabled"]:
+            self.popup_queue.clear()
+            self.active_popup_task_id = None
+            self.popup_hide_timer.stop()
+            self.popup_frame.hide()
+
+    def fetch_remote_settings(self):
+        try:
+            response = requests.get(f"{self.server_url}/settings", timeout=2)
+        except requests.RequestException:
+            return DEFAULT_PI_SETTINGS.copy()
+
+        if response.status_code != 200:
+            return DEFAULT_PI_SETTINGS.copy()
+
+        payload = response.json()
+        if not isinstance(payload, dict):
+            return DEFAULT_PI_SETTINGS.copy()
+
+        settings = DEFAULT_PI_SETTINGS.copy()
+        settings.update(payload)
+        return settings
+
     def reset_scroll_area(self, name):
         state = self.scroll_states.get(name)
         if not state:
@@ -431,13 +530,16 @@ class PiDisplay(QMainWindow):
 
         scrollbar = state["area"].verticalScrollBar()
         scrollbar.setValue(0)
-        state["pause_ticks"] = 18
+        state["pause_ticks"] = self.pause_ticks_for(self.pi_settings["pi_scroll_pause_seconds"])
         state["at_bottom"] = False
 
     def queue_scroll_reset(self, name):
         QTimer.singleShot(0, lambda key=name: self.reset_scroll_area(key))
 
     def advance_auto_scroll(self):
+        pause_seconds = self.pi_settings["pi_scroll_pause_seconds"]
+        scroll_step = self.pi_settings["pi_scroll_step"]
+
         for state in self.scroll_states.values():
             scrollbar = state["area"].verticalScrollBar()
             maximum = scrollbar.maximum()
@@ -445,7 +547,7 @@ class PiDisplay(QMainWindow):
             if maximum <= 0:
                 if scrollbar.value() != 0:
                     scrollbar.setValue(0)
-                state["pause_ticks"] = 18
+                state["pause_ticks"] = self.pause_ticks_for(pause_seconds)
                 state["at_bottom"] = False
                 continue
 
@@ -456,15 +558,15 @@ class PiDisplay(QMainWindow):
             if state["at_bottom"]:
                 scrollbar.setValue(0)
                 state["at_bottom"] = False
-                state["pause_ticks"] = 18
+                state["pause_ticks"] = self.pause_ticks_for(pause_seconds)
                 continue
 
-            next_value = min(maximum, scrollbar.value() + state["step"])
+            next_value = min(maximum, scrollbar.value() + scroll_step)
             scrollbar.setValue(next_value)
 
             if next_value >= maximum:
                 state["at_bottom"] = True
-                state["pause_ticks"] = 36
+                state["pause_ticks"] = self.pause_ticks_for(pause_seconds * 2)
 
     def render_notices(self, notices):
         self.clear_layout(self.notices_layout)
@@ -515,8 +617,109 @@ class PiDisplay(QMainWindow):
         self.tasks_layout.addStretch(1)
         self.queue_scroll_reset("tasks")
 
+    def play_timer_sound(self):
+        if not self.pi_settings["pi_timer_sound_enabled"]:
+            return
+
+        sound_options = [
+            ("paplay", "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"),
+            ("aplay", "/usr/share/sounds/alsa/Front_Center.wav"),
+        ]
+
+        for player, sound_file in sound_options:
+            player_path = shutil.which(player)
+            if not player_path or not os.path.exists(sound_file):
+                continue
+            try:
+                subprocess.Popen(
+                    [player_path, sound_file],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                return
+            except Exception:
+                continue
+
+        QApplication.beep()
+
+    def enqueue_popup(self, task):
+        task_id = task["id"]
+        if task_id == self.active_popup_task_id:
+            return
+        if any(queued_task["id"] == task_id for queued_task in self.popup_queue):
+            return
+
+        self.popup_queue.append(task)
+        if not self.popup_frame.isVisible():
+            self.show_next_popup()
+
+    def show_next_popup(self):
+        if not self.pi_settings["pi_timer_popup_enabled"]:
+            self.popup_queue.clear()
+            self.active_popup_task_id = None
+            self.popup_frame.hide()
+            return
+
+        if not self.popup_queue:
+            self.active_popup_task_id = None
+            self.popup_frame.hide()
+            return
+
+        task = self.popup_queue.pop(0)
+        self.active_popup_task_id = task["id"]
+        self.popup_title_label.setText(task["title"])
+        self.popup_assignee_label.setText(f"Assignee: {task.get('assignee') or 'Unassigned'}")
+        due_text = task.get("due_time") or "No due note"
+        self.popup_due_label.setText(f"Due: {due_text}")
+        self.position_popup()
+        self.popup_frame.show()
+        self.popup_frame.raise_()
+        self.play_timer_sound()
+        self.popup_hide_timer.start(int(self.pi_settings["pi_timer_popup_duration_seconds"]) * 1000)
+
+    def hide_current_popup(self):
+        self.popup_frame.hide()
+        self.active_popup_task_id = None
+        if self.popup_queue:
+            self.show_next_popup()
+
+    def position_popup(self):
+        if not hasattr(self, "popup_frame"):
+            return
+
+        parent = self.centralWidget()
+        available_width = max(360, parent.width() - 80)
+        popup_width = min(760, available_width)
+        self.popup_frame.setFixedWidth(popup_width)
+        height = self.popup_frame.sizeHint().height()
+        x = max(20, (parent.width() - popup_width) // 2)
+        y = max(90, (parent.height() - height) // 4)
+        self.popup_frame.setGeometry(x, y, popup_width, height)
+
+    def process_elapsed_tasks(self, tasks):
+        elapsed_tasks = [task for task in tasks if task.get("timer_elapsed")]
+        elapsed_ids = {task["id"] for task in elapsed_tasks}
+        self.alerted_task_ids.intersection_update(elapsed_ids)
+
+        new_elapsed_tasks = [task for task in elapsed_tasks if task["id"] not in self.alerted_task_ids]
+        if not new_elapsed_tasks:
+            return
+
+        for task in new_elapsed_tasks:
+            self.alerted_task_ids.add(task["id"])
+
+        if self.pi_settings["pi_timer_popup_enabled"]:
+            for task in new_elapsed_tasks:
+                self.enqueue_popup(task)
+            return
+
+        if self.pi_settings["pi_timer_sound_enabled"]:
+            self.play_timer_sound()
+
     def refresh_data(self):
         try:
+            self.apply_pi_settings(self.fetch_remote_settings())
+
             notices_response = requests.get(f"{self.server_url}/notices", timeout=2)
             tasks_response = requests.get(f"{self.server_url}/tasks", timeout=2)
 
@@ -526,7 +729,9 @@ class PiDisplay(QMainWindow):
             if notices_ok:
                 self.render_notices(notices_response.json())
             if tasks_ok:
-                self.render_tasks(tasks_response.json())
+                tasks = tasks_response.json()
+                self.render_tasks(tasks)
+                self.process_elapsed_tasks(tasks)
 
             if notices_ok and tasks_ok:
                 self.set_connection_status("LIVE", "#1f9a57")
@@ -537,6 +742,10 @@ class PiDisplay(QMainWindow):
         except Exception as error:
             self.set_connection_status("OFFLINE", "#b94f3e")
             print(f"Refresh error: {error}")
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.position_popup()
 
 
 if __name__ == "__main__":

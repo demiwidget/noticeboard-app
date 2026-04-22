@@ -10,11 +10,19 @@ from sqlalchemy import inspect, text
 app = Flask(__name__)
 CORS(app)
 
-# Database configuration
 db_path = os.path.join(os.path.dirname(__file__), "noticeboard.db")
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
+
+SETTING_DEFINITIONS = {
+    "pi_timer_sound_enabled": {"type": "bool", "default": True},
+    "pi_timer_popup_enabled": {"type": "bool", "default": True},
+    "pi_timer_popup_duration_seconds": {"type": "int", "default": 30, "min": 5, "max": 300},
+    "pi_refresh_interval_seconds": {"type": "int", "default": 2, "min": 1, "max": 60},
+    "pi_scroll_step": {"type": "int", "default": 2, "min": 1, "max": 10},
+    "pi_scroll_pause_seconds": {"type": "int", "default": 2, "min": 1, "max": 30},
+}
 
 
 def format_duration(total_seconds):
@@ -48,6 +56,53 @@ def normalize_countdown_seconds(value):
         return None
 
     return countdown_seconds
+
+
+def serialize_setting_value(key, value):
+    if SETTING_DEFINITIONS[key]["type"] == "bool":
+        return "1" if value else "0"
+    return str(int(value))
+
+
+def deserialize_setting_value(key, raw_value):
+    if raw_value is None:
+        return SETTING_DEFINITIONS[key]["default"]
+
+    if SETTING_DEFINITIONS[key]["type"] == "bool":
+        return str(raw_value).strip().lower() in {"1", "true", "yes", "on"}
+
+    try:
+        return int(raw_value)
+    except (TypeError, ValueError):
+        return int(SETTING_DEFINITIONS[key]["default"])
+
+
+def coerce_setting_value(key, value):
+    definition = SETTING_DEFINITIONS[key]
+
+    if definition["type"] == "bool":
+        if isinstance(value, bool):
+            return value
+        text_value = str(value).strip().lower()
+        if text_value in {"1", "true", "yes", "on"}:
+            return True
+        if text_value in {"0", "false", "no", "off"}:
+            return False
+        raise ValueError(f"{key} must be true or false.")
+
+    try:
+        coerced_value = int(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{key} must be a whole number.") from None
+
+    min_value = definition.get("min")
+    max_value = definition.get("max")
+    if min_value is not None and coerced_value < min_value:
+        raise ValueError(f"{key} must be at least {min_value}.")
+    if max_value is not None and coerced_value > max_value:
+        raise ValueError(f"{key} must be at most {max_value}.")
+
+    return coerced_value
 
 
 def request_display_refresh():
@@ -92,6 +147,12 @@ class Notice(db.Model):
             "priority": self.priority,
             "created_at": self.created_at.isoformat(),
         }
+
+
+class Setting(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(120), unique=True, nullable=False)
+    value = db.Column(db.String(120), nullable=False)
 
 
 class Assignee(db.Model):
@@ -172,6 +233,31 @@ def ensure_assignee(name):
     return assignee
 
 
+def ensure_default_settings():
+    for key, definition in SETTING_DEFINITIONS.items():
+        existing = Setting.query.filter_by(key=key).first()
+        if existing:
+            continue
+        db.session.add(Setting(key=key, value=serialize_setting_value(key, definition["default"])))
+
+
+def get_settings_payload():
+    records = {setting.key: setting.value for setting in Setting.query.all()}
+    payload = {}
+    for key, definition in SETTING_DEFINITIONS.items():
+        payload[key] = deserialize_setting_value(key, records.get(key, definition["default"]))
+    return payload
+
+
+def set_setting_value(key, value):
+    record = Setting.query.filter_by(key=key).first()
+    if not record:
+        record = Setting(key=key, value=serialize_setting_value(key, value))
+        db.session.add(record)
+        return
+    record.value = serialize_setting_value(key, value)
+
+
 def initialize_database():
     db.create_all()
 
@@ -190,7 +276,8 @@ def initialize_database():
     if pending_alters:
         db.session.commit()
 
-    # Backfill assignees from existing tasks so saved names appear immediately.
+    ensure_default_settings()
+
     task_assignees = db.session.execute(
         text("SELECT DISTINCT assignee FROM task WHERE assignee IS NOT NULL AND TRIM(assignee) != ''")
     ).fetchall()
@@ -231,6 +318,30 @@ def delete_notice(id):
     db.session.delete(notice)
     db.session.commit()
     return "", 204
+
+
+@app.route("/api/settings", methods=["GET"])
+def get_settings():
+    return jsonify(get_settings_payload())
+
+
+@app.route("/api/settings", methods=["PUT"])
+def update_settings():
+    data = request.json or {}
+    unknown_keys = [key for key in data if key not in SETTING_DEFINITIONS]
+    if unknown_keys:
+        return jsonify({"error": f"Unknown setting(s): {', '.join(sorted(unknown_keys))}"}), 400
+
+    try:
+        coerced_values = {key: coerce_setting_value(key, value) for key, value in data.items()}
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+    for key, value in coerced_values.items():
+        set_setting_value(key, value)
+
+    db.session.commit()
+    return jsonify(get_settings_payload())
 
 
 @app.route("/api/assignees", methods=["GET"])

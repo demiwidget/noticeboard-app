@@ -2,7 +2,7 @@ import sys
 
 import qtawesome as qta
 import requests
-from PyQt6.QtCore import QSettings, QSize, QTimer, Qt
+from PyQt6.QtCore import QSize, QSettings, QTimer, Qt
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
     QApplication,
@@ -24,6 +24,15 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+DEFAULT_REMOTE_SETTINGS = {
+    "pi_timer_sound_enabled": True,
+    "pi_timer_popup_enabled": True,
+    "pi_timer_popup_duration_seconds": 30,
+    "pi_refresh_interval_seconds": 2,
+    "pi_scroll_step": 2,
+    "pi_scroll_pause_seconds": 2,
+}
+
 
 class ModernButton(QPushButton):
     def __init__(self, text, color="#3498db", icon=None):
@@ -32,7 +41,6 @@ class ModernButton(QPushButton):
             try:
                 self.setIcon(qta.icon(icon, color="white"))
             except Exception:
-                # Keep the app usable if a qtawesome icon name changes.
                 pass
         self.setStyleSheet(f"""
             QPushButton {{
@@ -59,18 +67,20 @@ class ModernButton(QPushButton):
 class NoticeBoardAdmin(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.settings = QSettings("Demiwidget", "NoticeboardManager")
-        self.saved_server_host = self.settings.value("server_host", "localhost", type=str) or "localhost"
+        self.local_settings = QSettings("Demiwidget", "NoticeboardManager")
+        self.saved_server_host = self.local_settings.value("server_host", "localhost", type=str) or "localhost"
         self.server_url = self.build_server_url_from_host(self.saved_server_host)
         self.cached_tasks = []
-        self.elapsed_notified_ids = set()
         self.assignee_api_available = False
+        self.remote_settings_available = False
+        self.remote_settings = DEFAULT_REMOTE_SETTINGS.copy()
 
         self.setWindowTitle("Noticeboard Manager")
-        self.setMinimumSize(980, 740)
+        self.setMinimumSize(1040, 760)
 
         self.init_ui()
         self.apply_styles()
+        self.update_connection_labels()
 
         self.task_poll_timer = QTimer(self)
         self.task_poll_timer.timeout.connect(self.poll_tasks)
@@ -153,17 +163,12 @@ class NoticeBoardAdmin(QMainWindow):
         title_label.setFont(QFont("Arial", 24, QFont.Weight.Bold))
         title_label.setStyleSheet("color: #2c3e50;")
         header.addWidget(title_label)
+
         header.addStretch()
 
-        self.server_input = QLineEdit()
-        self.server_input.setPlaceholderText("Server IP (e.g., 192.168.1.100)")
-        self.server_input.setFixedWidth(250)
-        self.server_input.setText(self.saved_server_host)
-        header.addWidget(self.server_input)
-
-        connect_btn = ModernButton("Connect", "#2ecc71", "fa5s.link")
-        connect_btn.clicked.connect(self.update_server_url)
-        header.addWidget(connect_btn)
+        self.connection_summary_label = QLabel()
+        self.connection_summary_label.setStyleSheet("color: #1f7a43; font-weight: 700;")
+        header.addWidget(self.connection_summary_label)
 
         self.restart_display_btn = ModernButton("Restart Pi Display", "#e67e22", "fa5s.redo-alt")
         self.restart_display_btn.clicked.connect(self.restart_pi_display)
@@ -182,18 +187,45 @@ class NoticeBoardAdmin(QMainWindow):
         self.setup_task_tab()
         self.tabs.addTab(self.task_tab, "Assign Tasks")
 
+        self.settings_tab = QWidget()
+        self.setup_settings_tab()
+        self.tabs.addTab(self.settings_tab, "Settings")
+
         refresh_btn = ModernButton("Refresh All Data", "#9b59b6", "fa5s.sync")
-        refresh_btn.clicked.connect(self.refresh_data)
+        refresh_btn.clicked.connect(lambda: self.refresh_data(show_errors=True))
         layout.addWidget(refresh_btn, alignment=Qt.AlignmentFlag.AlignRight)
+
+    def create_card(self, title, subtitle=None):
+        frame = QFrame()
+        frame.setStyleSheet("""
+            QFrame {
+                background: white;
+                border: 1px solid #dfe4ea;
+                border-radius: 12px;
+            }
+        """)
+        layout = QVBoxLayout(frame)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(10)
+
+        heading = QLabel(title)
+        heading.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+        heading.setStyleSheet("color: #2c3e50;")
+        layout.addWidget(heading)
+
+        if subtitle:
+            subtitle_label = QLabel(subtitle)
+            subtitle_label.setWordWrap(True)
+            subtitle_label.setStyleSheet("color: #52606d;")
+            layout.addWidget(subtitle_label)
+
+        return frame, layout
 
     def setup_notice_tab(self):
         layout = QHBoxLayout(self.notice_tab)
 
-        form_container = QFrame()
-        form_container.setFixedWidth(350)
-        form_layout = QVBoxLayout(form_container)
-
-        form_layout.addWidget(QLabel("<b>Add New Notice</b>"))
+        form_container, form_layout = self.create_card("Add New Notice")
+        form_container.setFixedWidth(360)
 
         self.notice_title = QLineEdit()
         self.notice_title.setPlaceholderText("Notice Title")
@@ -216,27 +248,24 @@ class NoticeBoardAdmin(QMainWindow):
 
         layout.addWidget(form_container)
 
-        list_container = QVBoxLayout()
-        list_container.addWidget(QLabel("<b>Current Notices</b>"))
+        list_container, list_layout = self.create_card("Current Notices")
         self.notice_list = QListWidget()
         self.notice_list.setSpacing(5)
-        list_container.addWidget(self.notice_list)
+        list_layout.addWidget(self.notice_list)
 
         del_btn = ModernButton("Remove Selected", "#e74c3c", "fa5s.trash-alt")
         del_btn.clicked.connect(self.delete_notice)
-        list_container.addWidget(del_btn)
-
-        layout.addLayout(list_container)
+        list_layout.addWidget(del_btn)
+        layout.addWidget(list_container, 1)
 
     def setup_task_tab(self):
         layout = QHBoxLayout(self.task_tab)
 
-        form_container = QFrame()
-        form_container.setFixedWidth(400)
-        form_layout = QVBoxLayout(form_container)
-        form_layout.setSpacing(10)
-
-        form_layout.addWidget(QLabel("<b>Assign New Task</b>"))
+        form_container, form_layout = self.create_card(
+            "Assign New Task",
+            "Choose a saved person or type a new name. Timers are optional and can trigger Pi-side alerts.",
+        )
+        form_container.setFixedWidth(420)
 
         self.task_title = QLineEdit()
         self.task_title.setPlaceholderText("Task Title")
@@ -296,23 +325,25 @@ class NoticeBoardAdmin(QMainWindow):
 
         layout.addWidget(form_container)
 
-        list_container = QVBoxLayout()
-        list_container.addWidget(QLabel("<b>Current Tasks</b>"))
+        list_container, list_layout = self.create_card(
+            "Current Tasks",
+            "Elapsed timers are highlighted here. Sounds and popups now happen on the Pi display.",
+        )
 
         self.task_alert_label = QLabel("No timer alerts")
         self.task_alert_label.setWordWrap(True)
         self.set_task_alert_banner("No timer alerts", "#edf2f7", "#2f3640")
-        list_container.addWidget(self.task_alert_label)
+        list_layout.addWidget(self.task_alert_label)
 
         self.task_list = QListWidget()
         self.task_list.setSpacing(6)
-        list_container.addWidget(self.task_list)
+        list_layout.addWidget(self.task_list)
 
         del_btn = ModernButton("Remove Selected", "#e74c3c", "fa5s.trash-alt")
         del_btn.clicked.connect(self.delete_task)
-        list_container.addWidget(del_btn)
+        list_layout.addWidget(del_btn)
 
-        layout.addLayout(list_container)
+        layout.addWidget(list_container, 1)
 
         self.update_timer_inputs_enabled(False)
         self.set_assignee_controls_available(
@@ -321,26 +352,133 @@ class NoticeBoardAdmin(QMainWindow):
             "#8e44ad",
         )
 
-    def update_server_url(self):
-        host = self.current_server_host()
-        self.server_url = self.build_server_url_from_host(host)
-        self.settings.setValue("server_host", host)
-        self.refresh_data()
+    def setup_settings_tab(self):
+        layout = QVBoxLayout(self.settings_tab)
+        layout.setSpacing(16)
+
+        connection_card, connection_layout = self.create_card(
+            "Pi Connection",
+            "This connection setting is stored on this PC so the app remembers which Pi to talk to.",
+        )
+        self.server_host_input = QLineEdit()
+        self.server_host_input.setPlaceholderText("Pi host or IP address")
+        self.server_host_input.setText(self.saved_server_host)
+        connection_layout.addWidget(QLabel("Pi Host or IP:"))
+        connection_layout.addWidget(self.server_host_input)
+
+        connection_buttons = QHBoxLayout()
+        connect_btn = ModernButton("Apply Connection", "#2ecc71", "fa5s.link")
+        connect_btn.clicked.connect(self.update_server_url)
+        connection_buttons.addWidget(connect_btn)
+
+        reload_btn = ModernButton("Load Pi Settings", "#2980b9", "fa5s.download")
+        reload_btn.clicked.connect(lambda: self.load_remote_settings(show_errors=True))
+        connection_buttons.addWidget(reload_btn)
+        connection_layout.addLayout(connection_buttons)
+
+        self.connection_details_label = QLabel()
+        self.connection_details_label.setWordWrap(True)
+        connection_layout.addWidget(self.connection_details_label)
+        layout.addWidget(connection_card)
+
+        alerts_card, alerts_layout = self.create_card(
+            "Pi Timer Alerts",
+            "These settings are stored on the Pi backend and control sounds and timer popups on the display screen.",
+        )
+        self.setting_pi_sound_enabled = QCheckBox("Play timer sound on the Pi display")
+        alerts_layout.addWidget(self.setting_pi_sound_enabled)
+
+        self.setting_pi_popup_enabled = QCheckBox("Show timer popup on the Pi display")
+        alerts_layout.addWidget(self.setting_pi_popup_enabled)
+
+        popup_row = QHBoxLayout()
+        popup_row.addWidget(QLabel("Popup Duration (seconds):"))
+        self.setting_popup_duration = QSpinBox()
+        self.setting_popup_duration.setRange(5, 300)
+        popup_row.addWidget(self.setting_popup_duration)
+        popup_row.addStretch()
+        alerts_layout.addLayout(popup_row)
+        layout.addWidget(alerts_card)
+
+        display_card, display_layout = self.create_card(
+            "Pi Display Behaviour",
+            "These controls tune how often the Pi refreshes and how quickly long notice/task columns scroll.",
+        )
+
+        refresh_row = QHBoxLayout()
+        refresh_row.addWidget(QLabel("Pi Refresh Interval (seconds):"))
+        self.setting_refresh_interval = QSpinBox()
+        self.setting_refresh_interval.setRange(1, 60)
+        refresh_row.addWidget(self.setting_refresh_interval)
+        refresh_row.addStretch()
+        display_layout.addLayout(refresh_row)
+
+        scroll_speed_row = QHBoxLayout()
+        scroll_speed_row.addWidget(QLabel("Auto-Scroll Speed:"))
+        self.setting_scroll_step = QSpinBox()
+        self.setting_scroll_step.setRange(1, 10)
+        scroll_speed_row.addWidget(self.setting_scroll_step)
+        scroll_speed_row.addStretch()
+        display_layout.addLayout(scroll_speed_row)
+
+        scroll_pause_row = QHBoxLayout()
+        scroll_pause_row.addWidget(QLabel("Auto-Scroll Pause (seconds):"))
+        self.setting_scroll_pause = QSpinBox()
+        self.setting_scroll_pause.setRange(1, 30)
+        scroll_pause_row.addWidget(self.setting_scroll_pause)
+        scroll_pause_row.addStretch()
+        display_layout.addLayout(scroll_pause_row)
+        layout.addWidget(display_card)
+
+        actions_card, actions_layout = self.create_card(
+            "Save Settings",
+            "Use these buttons to push the current Pi display settings to the connected backend or reload them.",
+        )
+        actions_row = QHBoxLayout()
+        self.save_pi_settings_btn = ModernButton("Save Pi Settings", "#16a085", "fa5s.save")
+        self.save_pi_settings_btn.clicked.connect(self.save_remote_settings)
+        actions_row.addWidget(self.save_pi_settings_btn)
+
+        self.reload_pi_settings_btn = ModernButton("Reload Pi Settings", "#7f8c8d", "fa5s.sync-alt")
+        self.reload_pi_settings_btn.clicked.connect(lambda: self.load_remote_settings(show_errors=True))
+        actions_row.addWidget(self.reload_pi_settings_btn)
+        actions_layout.addLayout(actions_row)
+
+        self.pi_settings_status_label = QLabel("Pi settings have not been loaded yet.")
+        self.pi_settings_status_label.setWordWrap(True)
+        actions_layout.addWidget(self.pi_settings_status_label)
+        layout.addWidget(actions_card)
+
+        layout.addStretch()
+        self.populate_remote_settings_controls(DEFAULT_REMOTE_SETTINGS.copy())
+        self.update_remote_settings_availability(False, "Connect to the Pi and load its settings to edit them.")
 
     def current_server_host(self):
-        host = self.server_input.text().strip()
+        host = self.server_host_input.text().strip()
         if not host:
             host = "localhost"
         return host
-
-    def build_server_url(self):
-        return self.build_server_url_from_host(self.current_server_host())
 
     def build_server_url_from_host(self, host):
         return f"http://{host}:5000/api"
 
     def endpoint_url(self, path):
         return f"{self.server_url}/{path.lstrip('/')}"
+
+    def sync_server_host(self):
+        host = self.current_server_host()
+        self.saved_server_host = host
+        self.server_url = self.build_server_url_from_host(host)
+        self.local_settings.setValue("server_host", host)
+        self.update_connection_labels()
+        return host
+
+    def update_connection_labels(self):
+        summary = f"Configured Pi: {self.saved_server_host}"
+        self.connection_summary_label.setText(summary)
+        self.connection_details_label.setText(
+            f"Current API base: {self.server_url}\nUse Apply Connection after changing the Pi address."
+        )
 
     def response_message(self, response, fallback):
         try:
@@ -352,6 +490,99 @@ class NoticeBoardAdmin(QMainWindow):
             return payload.get("message") or payload.get("error") or fallback
 
         return fallback
+
+    def update_server_url(self):
+        self.sync_server_host()
+        self.refresh_data(show_errors=True)
+
+    def populate_remote_settings_controls(self, settings):
+        merged = DEFAULT_REMOTE_SETTINGS.copy()
+        merged.update(settings)
+        self.remote_settings = merged
+
+        self.setting_pi_sound_enabled.setChecked(bool(merged["pi_timer_sound_enabled"]))
+        self.setting_pi_popup_enabled.setChecked(bool(merged["pi_timer_popup_enabled"]))
+        self.setting_popup_duration.setValue(int(merged["pi_timer_popup_duration_seconds"]))
+        self.setting_refresh_interval.setValue(int(merged["pi_refresh_interval_seconds"]))
+        self.setting_scroll_step.setValue(int(merged["pi_scroll_step"]))
+        self.setting_scroll_pause.setValue(int(merged["pi_scroll_pause_seconds"]))
+
+    def collect_remote_settings_payload(self):
+        return {
+            "pi_timer_sound_enabled": self.setting_pi_sound_enabled.isChecked(),
+            "pi_timer_popup_enabled": self.setting_pi_popup_enabled.isChecked(),
+            "pi_timer_popup_duration_seconds": self.setting_popup_duration.value(),
+            "pi_refresh_interval_seconds": self.setting_refresh_interval.value(),
+            "pi_scroll_step": self.setting_scroll_step.value(),
+            "pi_scroll_pause_seconds": self.setting_scroll_pause.value(),
+        }
+
+    def update_remote_settings_availability(self, available, message):
+        self.remote_settings_available = available
+        self.save_pi_settings_btn.setEnabled(available)
+        self.reload_pi_settings_btn.setEnabled(True)
+        self.setting_pi_sound_enabled.setEnabled(available)
+        self.setting_pi_popup_enabled.setEnabled(available)
+        self.setting_popup_duration.setEnabled(available)
+        self.setting_refresh_interval.setEnabled(available)
+        self.setting_scroll_step.setEnabled(available)
+        self.setting_scroll_pause.setEnabled(available)
+        self.pi_settings_status_label.setText(message)
+        self.pi_settings_status_label.setStyleSheet(
+            f"color: {'#1f7a43' if available else '#c05621'}; font-weight: 600;"
+        )
+
+    def load_remote_settings(self, show_errors=False):
+        self.sync_server_host()
+        try:
+            response = requests.get(self.endpoint_url("settings"), timeout=3)
+        except requests.RequestException as error:
+            self.update_remote_settings_availability(False, f"Could not load Pi settings: {error}")
+            if show_errors:
+                QMessageBox.warning(self, "Connection Error", f"Could not load Pi settings: {error}")
+            return
+
+        if response.status_code == 200:
+            self.populate_remote_settings_controls(response.json())
+            self.update_remote_settings_availability(True, "Pi settings loaded. Changes here affect the display app.")
+            return
+
+        if response.status_code == 404:
+            self.populate_remote_settings_controls(DEFAULT_REMOTE_SETTINGS.copy())
+            self.update_remote_settings_availability(
+                False,
+                "This Pi backend does not support shared Pi settings yet. Pull the latest update on the Pi.",
+            )
+            if show_errors:
+                QMessageBox.warning(
+                    self,
+                    "Pi Settings Unavailable",
+                    "The connected Pi backend does not support shared Pi settings yet.",
+                )
+            return
+
+        message = self.response_message(response, f"Could not load Pi settings (HTTP {response.status_code}).")
+        self.update_remote_settings_availability(False, message)
+        if show_errors:
+            QMessageBox.warning(self, "Pi Settings Error", message)
+
+    def save_remote_settings(self):
+        self.sync_server_host()
+        payload = self.collect_remote_settings_payload()
+
+        try:
+            response = requests.put(self.endpoint_url("settings"), json=payload, timeout=5)
+        except requests.RequestException as error:
+            return QMessageBox.critical(self, "Pi Settings Error", f"Could not save Pi settings: {error}")
+
+        if response.status_code == 200:
+            self.populate_remote_settings_controls(response.json())
+            self.update_remote_settings_availability(True, "Pi settings saved. The display app will pick them up.")
+            QMessageBox.information(self, "Pi Settings Saved", "The connected Pi display settings were updated.")
+            return
+
+        message = self.response_message(response, f"Could not save Pi settings (HTTP {response.status_code}).")
+        QMessageBox.critical(self, "Pi Settings Error", message)
 
     def current_assignee_name(self):
         return self.task_assignee.currentText().strip()
@@ -514,7 +745,7 @@ class NoticeBoardAdmin(QMainWindow):
         QMessageBox.critical(self, "Saved People Error", message)
 
     def restart_pi_display(self):
-        self.server_url = self.build_server_url()
+        self.sync_server_host()
         reply = QMessageBox.question(
             self,
             "Restart Pi Display",
@@ -609,28 +840,11 @@ class NoticeBoardAdmin(QMainWindow):
 
     def update_task_alerts(self, tasks):
         elapsed_tasks = [task for task in tasks if task.get("timer_elapsed")]
-        elapsed_ids = {task["id"] for task in elapsed_tasks}
-        new_elapsed_tasks = [task for task in elapsed_tasks if task["id"] not in self.elapsed_notified_ids]
-
-        self.elapsed_notified_ids.intersection_update(elapsed_ids)
-        if new_elapsed_tasks:
-            self.play_alert_sound()
-            for task in new_elapsed_tasks:
-                self.elapsed_notified_ids.add(task["id"])
-
         if elapsed_tasks:
             names = ", ".join(f"{task['title']} ({task['assignee']})" for task in elapsed_tasks)
-            self.set_task_alert_banner(f"Timer elapsed: {names}", "#fff1ef", "#c0392b")
+            self.set_task_alert_banner(f"Pi alert active for: {names}", "#fff1ef", "#c0392b")
         else:
             self.set_task_alert_banner("No timer alerts", "#edf2f7", "#2f3640")
-
-    def play_alert_sound(self):
-        try:
-            import winsound
-
-            winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
-        except Exception:
-            QApplication.beep()
 
     def refresh_tasks(self, show_errors=True):
         selected_id = self.current_selected_id(self.task_list)
@@ -673,11 +887,14 @@ class NoticeBoardAdmin(QMainWindow):
         self.refresh_tasks(show_errors=False)
 
     def refresh_data(self, show_errors=True):
+        self.sync_server_host()
         self.refresh_notices(show_errors=show_errors)
         self.fetch_assignees(show_errors=False)
+        self.load_remote_settings(show_errors=False)
         self.refresh_tasks(show_errors=show_errors)
 
     def add_notice(self):
+        self.sync_server_host()
         data = {
             "title": self.notice_title.text().strip(),
             "content": self.notice_content.toPlainText().strip(),
@@ -701,6 +918,7 @@ class NoticeBoardAdmin(QMainWindow):
         QMessageBox.critical(self, "Error", message)
 
     def delete_notice(self):
+        self.sync_server_host()
         item = self.notice_list.currentItem()
         if not item:
             return
@@ -719,6 +937,7 @@ class NoticeBoardAdmin(QMainWindow):
         QMessageBox.critical(self, "Error", message)
 
     def add_task(self):
+        self.sync_server_host()
         assignee_name = self.current_assignee_name()
         countdown_seconds = None
 
@@ -761,6 +980,7 @@ class NoticeBoardAdmin(QMainWindow):
         QMessageBox.critical(self, "Error", message)
 
     def delete_task(self):
+        self.sync_server_host()
         item = self.task_list.currentItem()
         if not item:
             return
